@@ -1,49 +1,19 @@
 import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
-import {
-  AsyncPipe,
-  KeyValue,
-  KeyValuePipe,
-  NgForOf,
-  NgIf,
-} from '@angular/common';
-import { SafeUrl } from '@angular/platform-browser';
+import { AsyncPipe, KeyValuePipe, NgForOf, NgIf } from '@angular/common';
 import { Router } from '@angular/router';
-import {
-  FormGroup,
-  FormControl,
-  FormsModule,
-  ReactiveFormsModule,
-} from '@angular/forms';
-
-import { isNil, last, omit } from 'lodash-es';
+import { FormGroup, FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { forEach, isNil, last, max, omit } from 'lodash-es';
 import { Store, StoreModule } from '@ngrx/store';
-import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
-import { Observable, first, forkJoin, from, of, switchMap } from 'rxjs';
+import { Observable, first, forkJoin, from, of, switchMap, tap } from 'rxjs';
+import { AngularFirestore, DocumentReference, AngularFirestoreCollection } from '@angular/fire/compat/firestore';
+import { ImageTransform, ImageCroppedEvent, ImageCropperComponent } from 'ngx-image-cropper';
 
-import {
-  AngularFirestore,
-  DocumentReference,
-  AngularFirestoreCollection,
-} from '@angular/fire/compat/firestore';
-
-import {
-  ImageTransform,
-  ImageCroppedEvent,
-  ImageCropperComponent,
-} from 'ngx-image-cropper';
-
-import {
-  CoinState,
-  CoinActions,
-  CoinSelectors,
-} from '../store/coin/coin.store';
-
-import { Grades } from '../enums/grade.enum';
 import { AppState } from '../store/store.state';
 import { isDefined } from '../utils/value.utils';
 import { UserSelectors } from '../store/user/user.store';
 import { TagsComponent } from './tags/tags.component';
 import { MetaActions, MetaSelectors } from '../store/meta/meta.store';
+import { CoinState, CoinActions, CoinSelectors } from '../store/coin/coin.store';
 import { Coin, CoinForm } from '../models/coin.model';
 import { countries, grades } from '../static';
 import { toTitleCase } from '../utils/string.utils';
@@ -51,7 +21,11 @@ import { Sets } from '../models/sets.type';
 import { Tags } from '../models/tags.type';
 import { InPipe } from '../pipe/in.pipe';
 import { NinPipe } from '../pipe/not-in.pipe';
+import { Image } from '../models/image.model';
 import { filterObjectByValue } from '../utils/object.utils';
+import { DataService } from '../services/data.service';
+import { sortByValue } from '../utils/array.utils';
+import { mapToUpdate } from '../mappers/coin-update.mapper';
 
 @Component({
   selector: 'coin',
@@ -76,6 +50,7 @@ export class CoinComponent {
   public readonly grades = grades;
   public readonly countries = countries;
   public readonly toTitleCase = toTitleCase;
+  public readonly sortByValue = sortByValue;
   public readonly MetaSelectors = MetaSelectors;
 
   coinUID!: string;
@@ -84,27 +59,26 @@ export class CoinComponent {
   globalSets: Sets = {};
   globalTags: Tags = {};
 
-  image: { blob: Blob; url: SafeUrl } | null = null;
-  images: Array<{ blob: Blob; url: SafeUrl }> = [];
-  imageUrls: Array<string> = [];
+  image: Image | null = null;
+  images: Array<Image> = [];
+  imageCurrentIndex: number | null = null;
   imagePrimaryIndex: number | null = null;
   imageSecondaryIndex: number | null = null;
   transform: ImageTransform = {};
   collection$!: AngularFirestoreCollection;
   imageChangedEvent!: Event | null;
-  shouldJoinSet = (set?: string): boolean =>
-    set ? !(set in this.globalSets) : false;
-  shouldJoinTag = (tag?: string): boolean =>
-    tag ? !(tag in this.globalTags) : false;
+  shouldJoinSet = (set?: string): boolean => (set ? !(set in this.globalSets) : false);
+  shouldJoinTag = (tag?: string): boolean => (tag ? !(tag in this.globalTags) : false);
 
   form = new FormGroup<CoinForm>({
     sets: new FormControl(),
     tags: new FormControl(),
     name: new FormControl(),
-    year: new FormControl(2024),
+    year: new FormControl(),
     note: new FormControl(),
-    grade: new FormControl(Grades.UNC),
+    grade: new FormControl(),
     image: new FormControl(),
+    images: new FormControl(),
     country: new FormControl(),
     mintage: new FormControl(),
     isWanted: new FormControl(),
@@ -117,6 +91,7 @@ export class CoinComponent {
   @ViewChild('imageCropper') cropper!: ImageCropperComponent;
 
   constructor(
+    private readonly data: DataService,
     private readonly store: Store<AppState>,
     private readonly router: Router,
     private readonly firestore: AngularFirestore
@@ -134,23 +109,7 @@ export class CoinComponent {
     });
 
     this.form.valueChanges.subscribe((formValue) => {
-      this.store.dispatch(
-        CoinActions.update({
-          sets: formValue.sets,
-          tags: formValue.tags,
-          name: formValue.name,
-          year: formValue.year ?? null ?? undefined,
-          note: formValue.note,
-          grade: formValue.grade ?? null ?? undefined,
-          images: this.imageUrls,
-          country: formValue.country,
-          mintage: formValue.mintage,
-          isWanted: formValue.isWanted,
-          isReplace: formValue.isReplace,
-          isWaiting: formValue.isWaiting,
-          denomination: formValue.denomination,
-        })
-      );
+      this.updateCoinState(formValue);
     });
 
     this.form.controls.image.valueChanges.subscribe((image) => {
@@ -172,8 +131,8 @@ export class CoinComponent {
     });
   }
 
-  public ngOnInit() {
-    const storage = getStorage();
+  ngOnInit() {
+    this.form.valueChanges.subscribe(console.log);
 
     this.store
       .select(CoinSelectors.state)
@@ -181,150 +140,95 @@ export class CoinComponent {
       .subscribe((coin) => {
         if (coin.uid) {
           this.coinUID = coin.uid;
+          this.images = coin.images.map(() => ({ url: 'assets/placeholder.png' }));
           this.form.patchValue(coin);
 
           if (coin.images.length === 1) {
             this.imagePrimaryIndex = 0;
           }
 
-          forkJoin(
-            coin.images.map((image) =>
-              getDownloadURL(ref(storage, 'coins/' + image)).then((url) =>
-                this.imageUrls.push(url)
-              )
-            )
-          ).subscribe();
+          coin.images.forEach((image, index) => this.data.getImageUrl(image).subscribe((url) => (this.images[index] = { url })));
         }
       });
   }
 
-  public imageCropped(event: ImageCroppedEvent) {
-    if (event) {
-      this.image = {
-        blob: event.blob as Blob,
-        url: event.objectUrl as SafeUrl,
-      };
-    }
+  updateCoinState(coin: Partial<Coin>) {
+    this.store.dispatch(CoinActions.update(coin));
   }
 
-  public onImageChange(event: Event): void {
-    this.imageChangedEvent = event;
-  }
-
-  public createCoin(): void {
+  createCoin(): void {
     if (!this.isFilled) {
       return;
     }
 
     this.addCoin()
       .pipe(
-        switchMap((snapshot) => {
-          if (snapshot) {
-            const coinUID = last(snapshot.path.split('/')) as string;
-            this.coinUID = coinUID;
-
-            return forkJoin(
-              this.images.map((image, index) =>
-                this.loadImage(image, snapshot.id + '-' + index + '.png')
-              )
-            ).pipe(
-              switchMap((snapshots) => {
-                const images = snapshots.map((s) => s.metadata.name);
-                return this.collection$.doc(coinUID).update({ images });
-              })
-            );
-          }
-          return of([]);
-        })
+        tap((snapshot) => (this.coinUID = last(snapshot.path.split('/')) as string)),
+        switchMap(() => this.updateFirebaseImages())
       )
-      .subscribe(() => {
-        this.transform = {};
-        window.location.reload();
-      });
+      .subscribe(() => window.location.reload());
   }
 
-  public saveCoin(): void {
+  addCoin(): Observable<DocumentReference> {
+    const { tags, sets, name, year, note, grade, country, mintage, isWanted, isReplace, isWaiting, denomination } = this.form.getRawValue();
+
+    return from(
+      this.collection$.add({
+        tags,
+        sets,
+        name,
+        year,
+        note,
+        grade,
+        country,
+        mintage,
+        isWanted,
+        isReplace,
+        isWaiting,
+        denomination,
+      })
+    );
+  }
+
+  editCoin(): void {
     this.store
       .select(CoinSelectors.state)
       .pipe(
         first(),
         switchMap((coin: CoinState) => {
-          const payload: Partial<Coin> = {};
-
-          if (this.form.controls.name.dirty) {
-            payload.name = this.form.controls.name.value;
-          }
-
-          if (this.form.controls.year.dirty) {
-            payload.year = this.form.controls.year.value ?? null as any;
-          }
-
-          if (this.form.controls.grade.dirty) {
-            payload.grade = this.form.controls.grade.value ?? null ?? undefined;
-          }
-
-          if (this.form.controls.mintage.dirty) {
-            payload.mintage = this.form.controls.mintage.value;
-          }
-
-          if (this.form.controls.note.dirty) {
-            payload.note = this.form.controls.note.value;
-          }
-
-          if (this.form.controls.country.dirty) {
-            payload.country = this.form.controls.country.value;
-          }
-
-          if (this.form.controls.denomination.dirty) {
-            payload.denomination = this.form.controls.denomination.value;
-          }
-
-          if (this.form.controls.isWanted.dirty) {
-            payload.isWanted = this.form.controls.isWanted.value;
-          }
-
-          if (this.form.controls.isReplace.dirty) {
-            payload.isReplace = this.form.controls.isReplace.value;
-          }
-
-          if (this.form.controls.isWaiting.dirty) {
-            payload.isWaiting = this.form.controls.isWaiting.value;
-          }
-
-          payload.tags = this.form.controls.tags.value;
-
-          payload.sets = this.form.controls.sets.value;
-
-          return from(
-            this.firestore
-              .collection(this.userUID)
-              .doc(coin.uid)
-              .update(payload)
-          );
+          const payload = mapToUpdate(this.form);
+          return this.data.updateCoin$(this.userUID, coin.uid, payload);
         }),
-        switchMap(() => {
-          return this.form.controls.image.dirty
-            ? forkJoin(
-                this.images.map((image, index) =>
-                  this.loadImage(image, this.coinUID + '-' + index + '.png')
-                )
-              ).pipe(
-                switchMap((snapshots) => {
-                  const images = snapshots.map((s) => s.metadata.name);
-                  return this.collection$.doc(this.coinUID).update({ images });
-                })
-              )
-            : of(null);
-        })
+        switchMap(() => this.updateFirebaseImages())
       )
       .subscribe();
   }
 
-  public openFileDialog() {
+  deleteCoin(): void {
+    from(this.collection$.doc(this.coinUID).update({ isDeleted: true }))
+      .pipe(switchMap(() => this.deleteFirebaseImages()))
+      .subscribe(() => this.router.navigate(['list']));
+  }
+
+  openFileDialog() {
+    this.imageCurrentIndex = null;
     this.file.nativeElement.click();
   }
 
-  public onImageClick(imageIndex: number): void {
+  onImageCropped(event: ImageCroppedEvent) {
+    if (event) {
+      this.image = {
+        blob: event.blob as Blob,
+        url: event.objectUrl as string,
+      };
+    }
+  }
+
+  onImageChange(event: Event): void {
+    this.imageChangedEvent = event;
+  }
+
+  onImageClick(imageIndex: number): void {
     const isPrimary = isDefined(this.imagePrimaryIndex);
     const isSecondary = isDefined(this.imageSecondaryIndex);
 
@@ -350,80 +254,63 @@ export class CoinComponent {
     }
   }
 
-  private addCoin(): Observable<DocumentReference> {
-    const {
-      tags,
-      sets,
-      name,
-      year,
-      note,
-      grade,
-      country,
-      mintage,
-      isWanted,
-      isReplace,
-      isWaiting,
-      denomination,
-    } = this.form.getRawValue();
+  onImageDblClick(index: number): void {
+    this.openFileDialog();
+    this.imageCurrentIndex = index;
+  }
 
-    return from(
-      this.collection$.add({
-        tags,
-        sets,
-        name,
-        year,
-        note,
-        grade,
-        country,
-        mintage,
-        isWanted,
-        isReplace,
-        isWaiting,
-        denomination,
+  onDeleteImageClick(index: number): void {
+    this.images[index] = { url: '' };
+    if (this.imagePrimaryIndex === index) this.imagePrimaryIndex = null;
+    if (this.imageSecondaryIndex === index) this.imageSecondaryIndex = null;
+    this.form.controls.image.markAsDirty();
+  }
+
+  updateFirebaseImages(): Observable<any> {
+    const images$: Array<Observable<any>> = [];
+    const images = this.form.value.images ?? [];
+
+    let maxIndex = max(images.map((name) => +name.split('-')[1].replace('.png', ''))) ?? 0;
+
+    forEach(this.images, (image, index) => {
+      if (image.blob) {
+        const name = this.coinUID + '-' + ++maxIndex + '.png';
+        images$.push(this.data.uploadImage$(image.blob, name));
+      } else if (images[index]) {
+        images$.push(image.url ? of({ metadata: { name: images[index] } }) : this.data.deleteImage$(images[index]));
+      }
+    });
+
+    return forkJoin(images$).pipe(
+      switchMap((snapshots) => {
+        const images: Array<string> = [];
+        forEach(snapshots, (s, index) => (s ? images.push(s.metadata.name) : this.images.splice(index, 1)));
+        this.form.controls.images.setValue(images);
+        return this.collection$.doc(this.coinUID).update({ images });
       })
     );
   }
 
-  public deleteCoin(): void {
-    this.collection$
-      .doc(this.coinUID)
-      .update({ isDeleted: true })
-      .then(() => {
-        this.router.navigate(['list']);
-      });
+  deleteFirebaseImages(): Observable<any> {
+    this.images = this.images.map(() => ({ url: '' }));
+    return this.updateFirebaseImages();
   }
 
-  private loadImage(
-    image: { blob: Blob; url: SafeUrl },
-    name: string
-  ): Observable<any> {
-    return image.blob
-      ? from(uploadBytes(ref(getStorage(), 'coins/' + name), image.blob))
-      : of(null);
-  }
-
-  public sortByCountryName = (
-    a: KeyValue<string, string>,
-    b: KeyValue<string, string>
-  ): number => {
-    return a.value.localeCompare(b.value);
-  };
-
-  public backToList(): void {
+  backToList(): void {
     this.router.navigate(['list']);
   }
 
-  public addTag(tag: string) {
+  addTag(tag: string) {
     const control = this.form.controls.tags;
     control.setValue({ ...control.value, [tag]: '' });
   }
 
-  public addSet(set: string) {
+  addSet(set: string) {
     const control = this.form.controls.sets;
     control.setValue({ ...control.value, [set]: '' });
   }
 
-  public toggleSet(set: string) {
+  toggleSet(set: string) {
     const control = this.form.controls.sets;
     control.markAsDirty();
 
@@ -438,7 +325,7 @@ export class CoinComponent {
     }
   }
 
-  public toggleTag(tag: string) {
+  toggleTag(tag: string) {
     const control = this.form.controls.tags;
     control.markAsDirty();
 
@@ -453,7 +340,7 @@ export class CoinComponent {
     }
   }
 
-  public toggleGlobalTag(tag: string): void {
+  toggleGlobalTag(tag: string): void {
     const isGlobal = !isNil(this.globalTags[tag]);
 
     if (isGlobal) {
@@ -468,7 +355,7 @@ export class CoinComponent {
       .set({ tags: { [tag]: isGlobal ? null : '' } }, { merge: true });
   }
 
-  public toggleGlobalSet(set: string): void {
+  toggleGlobalSet(set: string): void {
     const isGlobal = !isNil(this.globalSets[set]);
 
     if (isGlobal) {
@@ -483,23 +370,23 @@ export class CoinComponent {
       .set({ sets: { [set]: isGlobal ? null : '' } }, { merge: true });
   }
 
-  public get sets(): Sets {
+  get sets(): Sets {
     return this.form.controls.sets.value ?? {};
   }
 
-  public get allSets(): Sets {
+  get allSets(): Sets {
     return { ...this.globalSets, ...this.sets };
   }
 
-  public get tags(): Tags {
+  get tags(): Tags {
     return this.form.controls.tags.value ?? {};
   }
 
-  public get allTags(): Tags {
+  get allTags(): Tags {
     return { ...this.globalTags, ...this.tags };
   }
 
-  private get isFilled(): boolean {
+  get isFilled(): boolean {
     return this.form.controls.name && !!this.form.controls.year;
   }
 
@@ -507,8 +394,7 @@ export class CoinComponent {
   onWheel(event: WheelEvent): void {
     if (event.ctrlKey) {
       event.preventDefault();
-      const scale =
-        (this.transform.scale ?? 0) + (event.deltaY > 0 ? 0.1 : -0.1);
+      const scale = (this.transform.scale ?? 0) + (event.deltaY > 0 ? 0.1 : -0.1);
       this.transform = { ...this.transform, scale };
     }
 
@@ -523,8 +409,7 @@ export class CoinComponent {
   onDrag(event: DragEvent): void {
     event.preventDefault();
     if (event.buttons === 1 && event.ctrlKey) {
-      const rotate =
-        (this.transform.rotate ?? 0) + (event.movementY > 0 ? 1 : -1);
+      const rotate = (this.transform.rotate ?? 0) + (event.movementY > 0 ? 1 : -1);
       this.transform = { ...this.transform, rotate };
     }
   }
@@ -534,8 +419,8 @@ export class CoinComponent {
     if (this.image) {
       event.preventDefault();
 
-      this.images.push(this.image);
-      this.imageUrls.push(this.image.url as string);
+      const index = this.imageCurrentIndex ?? this.images.length;
+      this.images[index] = this.image;
       this.form.controls.image.reset();
       this.form.controls.image.markAsDirty();
       this.image = null;

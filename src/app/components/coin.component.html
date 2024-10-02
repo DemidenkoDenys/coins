@@ -1,78 +1,95 @@
 <button class="back-to-list-btn" (click)="backToList()">&swarr;</button>
 
 <form [formGroup]="form" class="coin-form">
-  <div>
-    <label for="name">Name:</label>
-    <input id="name" type="text" formControlName="name" />
-  </div>
-
-  <div>
+  <!-- main form -->
+  <ng-container>
     <div>
-      <label for="denomination">Deno:</label>
-      <input id="denomination" type="number" formControlName="denomination" />
+      <label for="name">Name:</label>
+      <input id="name" type="text" formControlName="name" />
     </div>
 
     <div>
-      <label for="mintage">Mintage:</label>
-      <input id="mintage" type="number" formControlName="mintage" />
+      <div>
+        <label for="denomination">Deno:</label>
+        <input id="denomination" type="number" formControlName="denomination" />
+      </div>
+
+      <div>
+        <label for="mintage">Mintage:</label>
+        <input id="mintage" type="number" formControlName="mintage" />
+      </div>
     </div>
-  </div>
 
-  <div>
-    <label for="year">Year:</label>
-    <input
-      id="year"
-      type="number"
-      formControlName="year"
-      min="1800"
-      max="2100"
-    />
-  </div>
+    <div>
+      <label for="year">Year:</label>
+      <input id="year" type="number" formControlName="year" min="1800" max="2100" />
+    </div>
 
-  <div>
-    <label for="country">Country:</label>
-    <select id="country" name="country" formControlName="country">
-      <option
-        *ngFor="let country of countries | keyvalue : sortByCountryName"
-        [value]="country.key"
-      >
-        {{ country.value }}
-      </option>
-    </select>
-  </div>
+    <div>
+      <label for="country">Country:</label>
+      <select id="country" name="country" formControlName="country">
+        <option *ngFor="let country of countries | keyvalue : sortByValue" [value]="country.key">
+          {{ country.value }}
+        </option>
+      </select>
+    </div>
 
-  <div>
-    <label for="grade">Grade:</label>
-    <select id="grade" name="grade" formControlName="grade">
-      <option *ngFor="let grade of grades | keyvalue" [value]="grade.key">
-        {{ grade.key }} - {{ grade.value }}
-      </option>
-    </select>
-  </div>
+    <div>
+      <label for="grade">Grade:</label>
+      <select id="grade" name="grade" formControlName="grade">
+        <option *ngFor="let grade of grades | keyvalue" [value]="grade.key">{{ grade.key }} - {{ grade.value }}</option>
+      </select>
+    </div>
 
-  <div>
-    <label for="note">Note:</label>
-    <textarea id="note" formControlName="note" cols="5" rows="5"></textarea>
-  </div>
+    <div>
+      <label for="note">Note:</label>
+      <textarea id="note" formControlName="note" cols="5" rows="5"></textarea>
+    </div>
+  </ng-container>
 
-  <fieldset>
-    <img
-      *ngFor="let image of imageUrls; let index = index"
-      [attr.src]="image"
-      [class.primary]="imagePrimaryIndex === index"
-      [class.secondary]="imageSecondaryIndex === index"
-      (click)="onImageClick(index)"
-    />
+  <ng-container>
+    <fieldset>
+      <!-- images form -->
+      <ng-container *ngFor="let image of images; let index = index">
+        <figure *ngIf="image.url">
+          <img
+            [attr.src]="image.url"
+            [class.primary]="imagePrimaryIndex === index"
+            [class.secondary]="imageSecondaryIndex === index"
+            (click)="onImageClick(index)"
+            (dblclick)="onImageDblClick(index)"
+          />
 
-    <button class="open-file-button" (click)="openFileDialog()">+</button>
+          <button (click)="onDeleteImageClick(index)">x</button>
+        </figure>
+      </ng-container>
 
-    <input
-      #file
-      type="file"
-      formControlName="image"
-      (change)="onImageChange($event)"
-    /><br />
+      <button class="open-file-button" (click)="openFileDialog()">+</button>
+    </fieldset>
 
+    <input #file type="file" formControlName="image" (change)="onImageChange($event)" /><br />
+
+    <image-cropper
+      *ngIf="imageChangedEvent"
+      #imageCropper
+      format="jpeg"
+      [autoCrop]="true"
+      [(transform)]="transform"
+      [imageQuality]="50"
+      [roundCropper]="true"
+      [onlyScaleDown]="true"
+      [resizeToWidth]="500"
+      [resizeToHeight]="500"
+      [allowMoveImage]="true"
+      [initialStepSize]="0"
+      [imageChangedEvent]="imageChangedEvent"
+      [maintainAspectRatio]="true"
+      (imageCropped)="onImageCropped($event)"
+    ></image-cropper>
+  </ng-container>
+
+  <!-- tags controllers -->
+  <ng-container>
     <tags
       type="set"
       title="Sets: "
@@ -98,70 +115,32 @@
       (toggled)="toggleTag($event)"
       (entered)="addTag($event)"
     ></tags>
-  </fieldset>
+  </ng-container>
 
+  <!-- action buttons -->
   <div class="coin-buttons">
-    <button
-      [disabled]="coinUID || form.pristine"
-      (click)="createCoin()"
-      class="mr-10"
-    >
-      Create
-    </button>
+    <button [disabled]="coinUID || form.pristine" (click)="createCoin()" class="mr-10">Create</button>
 
-    <button
-      [disabled]="!coinUID || form.pristine"
-      (click)="saveCoin()"
-      class="mr-10"
-    >
-      Save
-    </button>
+    <button [disabled]="!coinUID || form.pristine" (click)="editCoin()" class="mr-10">Save</button>
 
-    <button [disabled]="!coinUID" (click)="deleteCoin()" class="ml-auto">
-      Delete
-    </button>
+    <button [disabled]="!coinUID" (click)="deleteCoin()" class="ml-auto">Delete</button>
   </div>
 
-  <p class="mr-10 text-center">
-    <input id="isWanted" type="checkbox" formControlName="isWanted" />
-    <label for="isWanted">Wanted</label>
-  </p>
+  <!-- state checkboxes -->
+  <ng-container>
+    <p class="mr-10 text-center">
+      <input id="isWanted" type="checkbox" formControlName="isWanted" />
+      <label for="isWanted">Wanted</label>
+    </p>
 
-  <p class="mr-10 text-center">
-    <input
-      id="isWaiting"
-      type="checkbox"
-      formControlName="isWaiting"
-      [disabled]="form.controls.isReplace.disabled"
-    />
-    <label for="isWaiting">Waiting</label>
-  </p>
+    <p class="mr-10 text-center">
+      <input id="isWaiting" type="checkbox" formControlName="isWaiting" [disabled]="form.controls.isReplace.disabled" />
+      <label for="isWaiting">Waiting</label>
+    </p>
 
-  <p class="mr-10 text-center">
-    <input
-      id="isReplace"
-      type="checkbox"
-      formControlName="isReplace"
-      [disabled]="form.controls.isReplace.disabled"
-    />
-    <label for="isReplace">Replace it</label>
-  </p>
+    <p class="mr-10 text-center">
+      <input id="isReplace" type="checkbox" formControlName="isReplace" [disabled]="form.controls.isReplace.disabled" />
+      <label for="isReplace">Replace it</label>
+    </p>
+  </ng-container>
 </form>
-
-<image-cropper
-  *ngIf="imageChangedEvent"
-  #imageCropper
-  format="jpeg"
-  [autoCrop]="true"
-  [(transform)]="transform"
-  [imageQuality]="50"
-  [roundCropper]="true"
-  [onlyScaleDown]="true"
-  [resizeToWidth]="500"
-  [resizeToHeight]="500"
-  [allowMoveImage]="true"
-  [initialStepSize]="0"
-  [imageChangedEvent]="imageChangedEvent"
-  [maintainAspectRatio]="true"
-  (imageCropped)="imageCropped($event)"
-></image-cropper>

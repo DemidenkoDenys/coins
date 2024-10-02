@@ -8,6 +8,7 @@ import { AngularFireAuthModule } from '@angular/fire/compat/auth';
 import { AngularFirestoreModule } from '@angular/fire/compat/firestore';
 
 import { environment } from '../environments/environment.dev';
+import { DataService } from './services/data.service';
 import { AppComponent } from './app.component';
 import { RouterModule } from '@angular/router';
 import { CoinResolver } from './resolvers/coin.resolver';
@@ -43,6 +44,7 @@ export const routes: Routes = [
     AngularFirestoreModule,
     BrowserAnimationsModule,
   ],
+  providers: [DataService],
   bootstrap: [AppComponent],
 })
 export class AppModule {}

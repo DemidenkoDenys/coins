@@ -26,10 +26,11 @@ export interface CoinForm {
   sets: FormControl<Sets>;
   tags: FormControl<Tags>;
   name: FormControl<string>;
-  year: FormControl<number | null>;
+  year: FormControl<number>;
   note: FormControl<string>;
-  grade: FormControl<Grades | null>;
+  grade: FormControl<Grades>;
   image: FormControl<string>;
+  images: FormControl<Array<string>>;
   country: FormControl<Country>;
   mintage: FormControl<number>;
   isWanted: FormControl<boolean>;

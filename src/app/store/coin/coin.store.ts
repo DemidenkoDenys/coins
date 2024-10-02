@@ -1,16 +1,10 @@
-import {
-  on,
-  createAction,
-  createReducer,
-  createFeatureSelector,
-} from '@ngrx/store';
+import { on, createAction, createReducer, createFeatureSelector } from '@ngrx/store';
 
 import { Coin } from '../../models/coin.model';
 import { Tags } from '../../models/tags.type';
 import { Sets } from '../../models/sets.type';
 import { Grades } from '../../enums/grade.enum';
 import { Country } from '../../enums/country.enum';
-import { ListItem } from '../../models/list-item.model';
 
 export const COIN = '[COIN]';
 
@@ -29,9 +23,7 @@ export class CoinState implements Coin {
 }
 
 export class CoinActions {
-  static update = createAction(COIN + ' Update', (coin: Partial<ListItem>) => ({
-    coin,
-  }));
+  static update = createAction(COIN + ' Update', (coin: Partial<Coin>) => ({ coin }));
   static reset = createAction(COIN + ' Reset');
 }
 
