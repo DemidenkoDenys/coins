@@ -1,0 +1,28 @@
+<p *ngIf="!isEmpty(items) || additable" [class.togglable]="togglable">
+  <strong *ngIf="title">{{ title }}</strong>
+
+  <mark
+    *ngIf="additable"
+    class="{{ type }}"
+    contenteditable="true"
+    (keydown.enter)="onEntered($event)"
+  ></mark>
+
+  <mark
+    *ngFor="
+      let item of items
+        | keyvalue : (!!formatter ? sortByKeyFormatted : sortByKey)
+    "
+    class="{{ type }}"
+    [class.selected]="item.key | in : selectedItems"
+  >
+    <a (click)="onToggled(item.key)">{{
+      !!formatter ? formatter(toTitleCase(item.key)) : toTitleCase(item.key)
+    }}</a>
+
+    <button *ngIf="shouldJoin(item.key)" (click)="onJoined(item.key)">+</button>
+    <button *ngIf="shouldDetach(item.key)" (click)="onDetached(item.key)">
+      -
+    </button>
+  </mark>
+</p>

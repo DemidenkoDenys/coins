@@ -1,0 +1,128 @@
+<div>
+  <div class="coins-search">
+    <input type="text" placeholder="Search" (input)="onSearchChanged($event)" />
+    <button class="coin-new-btn" (click)="openNewCoin()">+</button>
+
+    <sup>{{ amount }}</sup>
+
+    <div class="tags-search-options">
+      <tags
+        type="tag"
+        [items]="tags"
+        [togglable]="true"
+        [selectedItems]="selectedTag"
+        (toggled)="toggleTag('tag', $event)"
+      ></tags>
+
+      <br />
+
+      <tags
+        type="set"
+        [items]="sets"
+        [togglable]="true"
+        [selectedItems]="selectedTag"
+        (toggled)="toggleTag('set', $event)"
+      ></tags>
+
+      <br />
+
+      <tags
+        type="country"
+        [items]="countries"
+        [togglable]="true"
+        [formatter]="formatCountry"
+        [selectedItems]="selectedTag"
+        (toggled)="toggleTag('country', $event)"
+      ></tags>
+    </div>
+  </div>
+
+  <ul class="coins-list">
+    <li *ngFor="let item of coinsFiltered$ | async | keyvalue : sortCoinsList">
+      <ng-container *ngIf="item.value as coin">
+        <figure
+          (click)="openCoin(item.key)"
+          [class.wanted]="item.value.isWanted"
+        >
+          <img
+            *ngIf="coin.isReplace && isReplace"
+            class="replace-icon"
+            src="assets/replace.png"
+            alt="replace"
+          />
+
+          <img
+            *ngIf="coin.isWaiting && isWaiting"
+            class="delivery-icon"
+            src="assets/delivery.png"
+            alt="delivery"
+          />
+
+          <img [attr.src]="coin.primaryImage || placeholderImage" />
+
+          <ng-container *ngIf="coin.matchedBy.name; else plainName">
+            <figcaption
+              [innerHTML]="wrap(coin.name, coin.matchedBy.name)"
+            ></figcaption>
+          </ng-container>
+
+          <ng-template #plainName>
+            <figcaption>{{ coin.name }}</figcaption>
+          </ng-template>
+
+          <div class="center">
+            <tags type="tag" [items]="coin.matchedBy.tags"></tags>
+            <tags type="set" [items]="coin.matchedBy.sets"></tags>
+            <tags
+              type="country"
+              [items]="coin.matchedBy.country"
+              [formatter]="formatCountry"
+            ></tags>
+          </div>
+        </figure>
+      </ng-container>
+    </li>
+  </ul>
+
+  <div class="right-sidebar">
+    <p class="mr-10 text-right">
+      <input
+        id="isWanted"
+        type="checkbox"
+        [checked]="isWanted"
+        (change)="isWanted = $event"
+      />
+      <label for="isWanted">Wanted</label>
+    </p>
+
+    <p class="mr-10 text-right">
+      <input
+        id="isWaiting"
+        type="checkbox"
+        [checked]="isWaiting"
+        (change)="isWaiting = $event"
+      />
+      <label for="isWaiting">In delivery</label>
+    </p>
+
+    <p class="mr-10 text-right">
+      <input
+        id="isReplace"
+        type="checkbox"
+        [checked]="isReplace"
+        (change)="isReplace = $event"
+      />
+      <label for="isReplace">Need replace</label>
+    </p>
+
+    <p class="mr-10 text-right">
+      <input
+        id="isDeleted"
+        type="checkbox"
+        [checked]="isDeleted"
+        (change)="isDeleted = $event"
+      />
+      <label for="isDeleted">Deleted</label>
+    </p>
+  </div>
+</div>
