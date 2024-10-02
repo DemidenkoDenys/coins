@@ -1,16 +1,7 @@
-import { Component } from '@angular/core';
+import { NgIf, NgForOf, JsonPipe, AsyncPipe, KeyValuePipe, KeyValue } from '@angular/common';
+import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-
-import {
-  NgIf,
-  NgForOf,
-  JsonPipe,
-  AsyncPipe,
-  KeyValuePipe,
-  KeyValue,
-} from '@angular/common';
-
 import { of, map, Observable, combineLatest, BehaviorSubject } from 'rxjs';
 import { Store, StoreModule } from '@ngrx/store';
 import { forEach, isEmpty, toLower } from 'lodash-es';
@@ -31,16 +22,7 @@ import { filterObjectByValue, keysBy } from '../utils/object.utils';
 
 @Component({
   selector: 'coin-list',
-  imports: [
-    NgIf,
-    InPipe,
-    NgForOf,
-    JsonPipe,
-    AsyncPipe,
-    FormsModule,
-    KeyValuePipe,
-    TagsComponent,
-  ],
+  imports: [NgIf, InPipe, NgForOf, JsonPipe, AsyncPipe, FormsModule, KeyValuePipe, TagsComponent],
   providers: [StoreModule],
   standalone: true,
   templateUrl: 'coin-list.component.html',
@@ -48,8 +30,7 @@ import { filterObjectByValue, keysBy } from '../utils/object.utils';
 export class CoinListComponent {
   public readonly wrap = wrapSubstring;
   public readonly toTitleCase = toTitleCase;
-  public readonly formatCountry = (country: string) =>
-    countries[country] ?? country;
+  public readonly formatCountry = (country: string) => countries[country] ?? country;
   public readonly placeholderImage = 'assets/placeholder.png';
 
   public search$ = new BehaviorSubject<string>('');
@@ -62,20 +43,15 @@ export class CoinListComponent {
   public amount: number = 0;
   public countries: Tags = {};
 
-  constructor(
-    private readonly store: Store<AppState>,
-    private readonly router: Router
-  ) {
+  @ViewChild('imagesContainer', { static: true }) imagesContainer!: ElementRef<HTMLDivElement>;
+
+  constructor(private readonly store: Store<AppState>, private readonly router: Router) {
     this.store.select(MetaSelectors.state).subscribe((meta) => {
       this.sets = filterObjectByValue(meta.sets, isDefined) as Tags;
       this.tags = filterObjectByValue(meta.tags, isDefined) as Tags;
     });
 
-    this.coinsFiltered$ = combineLatest([
-      this.store.select(ListSelectors.coins),
-      this.search$,
-      this.filtered$,
-    ]).pipe(
+    this.coinsFiltered$ = combineLatest([this.store.select(ListSelectors.coins), this.search$, this.filtered$]).pipe(
       map(([coins, search]) => {
         let coinsFiltered = {} as Record<string, ListItem>;
 
@@ -115,10 +91,7 @@ export class CoinListComponent {
         }
 
         coinsFiltered = filterObjectByValue<any>(coinsFiltered, (coin) => {
-          return (
-            (this.isWanted ? true : !coin.isWanted) &&
-            (this.isDeleted ? true : !coin.isDeleted)
-          );
+          return (this.isWanted ? true : !coin.isWanted) && (this.isDeleted ? true : !coin.isDeleted);
         });
 
         forEach(coinsFiltered, (coin: ListItem, uid: string) => {
@@ -152,15 +125,11 @@ export class CoinListComponent {
 
   private updateTagsFilters(coin: ListItem): void {
     if (!isEmpty(coin.tags)) {
-      forEach(coin.tags, (_, tag) =>
-        this.tags[tag] ? null : (this.tags[tag] = '')
-      );
+      forEach(coin.tags, (_, tag) => (this.tags[tag] ? null : (this.tags[tag] = '')));
     }
 
     if (!isEmpty(coin.sets)) {
-      forEach(coin.sets, (_, set) =>
-        this.sets[set] ? null : (this.sets[set] = '')
-      );
+      forEach(coin.sets, (_, set) => (this.sets[set] ? null : (this.sets[set] = '')));
     }
 
     if (coin.country) {
@@ -168,10 +137,7 @@ export class CoinListComponent {
     }
   }
 
-  public sortCoinsList = (
-    a: KeyValue<string, ListItem>,
-    b: KeyValue<string, ListItem>
-  ): number => {
+  public sortCoinsList = (a: KeyValue<string, ListItem>, b: KeyValue<string, ListItem>): number => {
     return a.value.denomination !== b.value.denomination
       ? a.value.denomination - b.value.denomination
       : a.value.name.localeCompare(b.value.name);
@@ -202,18 +168,48 @@ export class CoinListComponent {
     this.router.navigate(['new']);
   }
 
+  imageExpanded!: HTMLImageElement;
+  imageExpandTimeout!: ReturnType<typeof setTimeout>;
+
+  onImageMousedown(index: number): void {
+    this.imageExpandTimeout = setTimeout(() => {
+      const image = this.imagesContainer.nativeElement.children[index].querySelector('figure') as HTMLImageElement;
+      const rect = image.getBoundingClientRect();
+
+      this.imageExpanded = image.cloneNode(true) as HTMLImageElement;
+      this.imageExpanded.classList.add('clone');
+      this.imageExpanded.style.top = `${rect.top}px`;
+      this.imageExpanded.style.left = `${rect.left}px`;
+
+      document.body.appendChild(this.imageExpanded);
+
+      setTimeout(() => this.imageExpanded.classList.add('expand'), 100);
+    }, 1000);
+  }
+
+  // @HostListener('document:touchend')
+  @HostListener('document:mouseup')
+  onMouseUp() {
+    clearTimeout(this.imageExpandTimeout);
+    if (this.imageExpanded) {
+      this.imageExpanded.remove();
+    }
+  }
+
+  @HostListener('touchend')
+  onTouchEnd() {
+    clearTimeout(this.imageExpandTimeout);
+    if (this.imageExpanded) {
+      this.imageExpanded.remove();
+    }
+  }
+
   public get selectedTag(): Tags {
     const tag = localStorage.getItem(TagKeys.tag);
     const set = localStorage.getItem(TagKeys.set);
     const country = localStorage.getItem(TagKeys.country);
 
-    return tag
-      ? { [tag]: '' }
-      : set
-      ? { [set]: '' }
-      : country
-      ? { [country]: '' }
-      : {};
+    return tag ? { [tag]: '' } : set ? { [set]: '' } : country ? { [country]: '' } : {};
   }
 
   public set isWanted(event: any) {

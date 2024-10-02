@@ -48,7 +48,7 @@
   </ng-container>
 
   <ng-container>
-    <fieldset>
+    <fieldset #imagesContainer>
       <!-- images form -->
       <ng-container *ngFor="let image of images; let index = index">
         <figure *ngIf="image.url">
@@ -58,6 +58,8 @@
             [class.secondary]="imageSecondaryIndex === index"
             (click)="onImageClick(index)"
             (dblclick)="onImageDblClick(index)"
+            (mousedown)="onImageMousedown(index)"
+            (touchstart)="onImageMousedown(index)"
           />
 
           <button (click)="onDeleteImageClick(index)">x</button>

@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { FormGroup, FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { forEach, isNil, last, max, omit } from 'lodash-es';
 import { Store, StoreModule } from '@ngrx/store';
-import { Observable, first, forkJoin, from, of, switchMap, tap } from 'rxjs';
+import { Observable, first, forkJoin, from, of, switchMap, tap, Subject } from 'rxjs';
 import { AngularFirestore, DocumentReference, AngularFirestoreCollection } from '@angular/fire/compat/firestore';
 import { ImageTransform, ImageCroppedEvent, ImageCropperComponent } from 'ngx-image-cropper';
 
@@ -69,6 +69,8 @@ export class CoinComponent {
   imageChangedEvent!: Event | null;
   shouldJoinSet = (set?: string): boolean => (set ? !(set in this.globalSets) : false);
   shouldJoinTag = (tag?: string): boolean => (tag ? !(tag in this.globalTags) : false);
+  imageMouseDown$ = new Subject();
+  imageExpanded!: HTMLImageElement;
 
   form = new FormGroup<CoinForm>({
     sets: new FormControl(),
@@ -89,6 +91,7 @@ export class CoinComponent {
 
   @ViewChild('file') file!: ElementRef;
   @ViewChild('imageCropper') cropper!: ImageCropperComponent;
+  @ViewChild('imagesContainer', { static: true }) imagesContainer!: ElementRef<HTMLDivElement>;
 
   constructor(
     private readonly data: DataService,
@@ -132,8 +135,6 @@ export class CoinComponent {
   }
 
   ngOnInit() {
-    this.form.valueChanges.subscribe(console.log);
-
     this.store
       .select(CoinSelectors.state)
       .pipe(first())
@@ -257,6 +258,33 @@ export class CoinComponent {
   onImageDblClick(index: number): void {
     this.openFileDialog();
     this.imageCurrentIndex = index;
+  }
+
+  imageExpandTimeout!: ReturnType<typeof setTimeout>;
+
+  onImageMousedown(index: number): void {
+    this.imageExpandTimeout = setTimeout(() => {
+      const image = this.imagesContainer.nativeElement.children[index] as HTMLImageElement;
+      const rect = image.getBoundingClientRect();
+
+      this.imageExpanded = image.cloneNode(true) as HTMLImageElement;
+      this.imageExpanded.classList.add('clone');
+      this.imageExpanded.style.top = `${rect.top}px`;
+      this.imageExpanded.style.left = `${rect.left}px`;
+
+      document.body.appendChild(this.imageExpanded);
+
+      setTimeout(() => this.imageExpanded.classList.add('expand'), 100);
+    }, 1000);
+  }
+
+  @HostListener('document:touchend')
+  @HostListener('document:mouseup')
+  onMouseUp() {
+    clearTimeout(this.imageExpandTimeout);
+    if (this.imageExpanded) {
+      this.imageExpanded.remove();
+    }
   }
 
   onDeleteImageClick(index: number): void {
