@@ -4,7 +4,7 @@
   <mark
     *ngIf="additable"
     class="{{ type }}"
-    contenteditable="true"
+    contenteditable="plaintext-only"
     (keydown.enter)="onEntered($event)"
   ></mark>
 

@@ -44,6 +44,7 @@ export class TagsComponent {
   }
 
   public onEntered(event: Event): void {
+    event.preventDefault();
     const element = (event as any).target;
     const text = toSnakeCase(element.textContent);
     this.entered.emit(text);
