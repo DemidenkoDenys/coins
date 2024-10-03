@@ -58,8 +58,8 @@
             [class.secondary]="imageSecondaryIndex === index"
             (click)="onImageClick(index)"
             (dblclick)="onImageDblClick(index)"
-            (mousedown)="onImageMousedown(index)"
-            (touchstart)="onImageMousedown(index)"
+            (mousedown)="onImageMousedown($event, index)"
+            (touchstart)="onImageMousedown($event, index)"
           />
 
           <button (click)="onDeleteImageClick(index)">x</button>

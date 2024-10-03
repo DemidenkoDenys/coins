@@ -19,6 +19,7 @@ import { TagsComponent } from './tags/tags.component';
 import { ListSelectors } from '../store/list/list.store';
 import { MetaSelectors } from '../store/meta/meta.store';
 import { filterObjectByValue, keysBy } from '../utils/object.utils';
+import { cloneImageAndExpand } from '../utils/html.utils';
 
 @Component({
   selector: 'coin-list',
@@ -168,40 +169,36 @@ export class CoinListComponent {
     this.router.navigate(['new']);
   }
 
-  imageExpanded!: HTMLImageElement;
-  imageExpandTimeout!: ReturnType<typeof setTimeout>;
+  imageExpanded!: HTMLImageElement | null;
+  imageExpandTimeout!: ReturnType<typeof setTimeout> | null;
 
-  onImageMousedown(index: number): void {
+  onImageMousedown(event: any, index: number): void {
     this.imageExpandTimeout = setTimeout(() => {
+      event.preventDefault();
       const image = this.imagesContainer.nativeElement.children[index].querySelector('figure') as HTMLImageElement;
-      const rect = image.getBoundingClientRect();
-
-      this.imageExpanded = image.cloneNode(true) as HTMLImageElement;
-      this.imageExpanded.classList.add('clone');
-      this.imageExpanded.style.top = `${rect.top}px`;
-      this.imageExpanded.style.left = `${rect.left}px`;
-
+      this.imageExpanded = cloneImageAndExpand(image);
       document.body.appendChild(this.imageExpanded);
-
-      setTimeout(() => this.imageExpanded.classList.add('expand'), 100);
     }, 1000);
   }
 
-  // @HostListener('document:touchend')
-  @HostListener('document:mouseup')
-  onMouseUp() {
-    clearTimeout(this.imageExpandTimeout);
+  @HostListener('document:touchend', ['$event'])
+  @HostListener('document:mouseup', ['$event'])
+  onMouseUp(event: any) {
+    if (this.imageExpandTimeout) {
+      event.preventDefault();
+      clearTimeout(this.imageExpandTimeout);
+      this.imageExpandTimeout = null;
+    }
     if (this.imageExpanded) {
+      event.preventDefault();
       this.imageExpanded.remove();
+      this.imageExpanded = null;
     }
   }
 
-  @HostListener('touchend')
-  onTouchEnd() {
-    clearTimeout(this.imageExpandTimeout);
-    if (this.imageExpanded) {
-      this.imageExpanded.remove();
-    }
+  @HostListener('document:contextmenu', ['$event'])
+  onContextMenu(event: any) {
+    event.preventDefault();
   }
 
   public get selectedTag(): Tags {

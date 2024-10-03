@@ -35,8 +35,8 @@
 
           <img
             [attr.src]="coin.primaryImage || placeholderImage"
-            (mousedown)="onImageMousedown(index)"
-            (touchstart)="onImageMousedown(index)"
+            (mousedown)="onImageMousedown($event, index)"
+            (touchstart)="onImageMousedown($event, index)"
           />
 
           <ng-container *ngIf="coin.matchedBy.name; else plainName">

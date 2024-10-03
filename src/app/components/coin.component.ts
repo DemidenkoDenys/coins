@@ -26,6 +26,7 @@ import { filterObjectByValue } from '../utils/object.utils';
 import { DataService } from '../services/data.service';
 import { sortByValue } from '../utils/array.utils';
 import { mapToUpdate } from '../mappers/coin-update.mapper';
+import { cloneImageAndExpand } from '../utils/html.utils';
 
 @Component({
   selector: 'coin',
@@ -70,7 +71,6 @@ export class CoinComponent {
   shouldJoinSet = (set?: string): boolean => (set ? !(set in this.globalSets) : false);
   shouldJoinTag = (tag?: string): boolean => (tag ? !(tag in this.globalTags) : false);
   imageMouseDown$ = new Subject();
-  imageExpanded!: HTMLImageElement;
 
   form = new FormGroup<CoinForm>({
     sets: new FormControl(),
@@ -260,31 +260,36 @@ export class CoinComponent {
     this.imageCurrentIndex = index;
   }
 
-  imageExpandTimeout!: ReturnType<typeof setTimeout>;
+  imageExpanded!: HTMLImageElement | null;
+  imageExpandTimeout!: ReturnType<typeof setTimeout> | null;
 
-  onImageMousedown(index: number): void {
+  onImageMousedown(event: any, index: number): void {
     this.imageExpandTimeout = setTimeout(() => {
+      event.preventDefault();
       const image = this.imagesContainer.nativeElement.children[index] as HTMLImageElement;
-      const rect = image.getBoundingClientRect();
-
-      this.imageExpanded = image.cloneNode(true) as HTMLImageElement;
-      this.imageExpanded.classList.add('clone');
-      this.imageExpanded.style.top = `${rect.top}px`;
-      this.imageExpanded.style.left = `${rect.left}px`;
-
+      this.imageExpanded = cloneImageAndExpand(image);
       document.body.appendChild(this.imageExpanded);
-
-      setTimeout(() => this.imageExpanded.classList.add('expand'), 100);
     }, 1000);
   }
 
-  @HostListener('document:touchend')
-  @HostListener('document:mouseup')
-  onMouseUp() {
-    clearTimeout(this.imageExpandTimeout);
-    if (this.imageExpanded) {
-      this.imageExpanded.remove();
+  @HostListener('document:touchend', ['$event'])
+  @HostListener('document:mouseup', ['$event'])
+  onMouseUp(event: any) {
+    if (this.imageExpandTimeout) {
+      event.preventDefault();
+      clearTimeout(this.imageExpandTimeout);
+      this.imageExpandTimeout = null;
     }
+    if (this.imageExpanded) {
+      event.preventDefault();
+      this.imageExpanded.remove();
+      this.imageExpanded = null;
+    }
+  }
+
+  @HostListener('document:contextmenu', ['$event'])
+  onContextMenu(event: any) {
+    event.preventDefault();
   }
 
   onDeleteImageClick(index: number): void {
