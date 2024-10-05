@@ -14,6 +14,7 @@ import { AppState } from '../store/store.state';
 import { ListItem } from '../models/list-item.model';
 import { isDefined } from '../utils/value.utils';
 import { countries } from '../static';
+import { Checkboxes } from '../enums/checkbox.enum';
 import { toTitleCase, wrapSubstring } from '../utils/string.utils';
 import { TagsComponent } from './tags/tags.component';
 import { ListSelectors } from '../store/list/list.store';
@@ -30,6 +31,7 @@ import { cloneImageAndExpand } from '../utils/html.utils';
 })
 export class CoinListComponent {
   public readonly wrap = wrapSubstring;
+  public readonly Checkboxes = Checkboxes;
   public readonly toTitleCase = toTitleCase;
   public readonly formatCountry = (country: string) => countries[country] ?? country;
   public readonly placeholderImage = 'assets/placeholder.png';
@@ -87,9 +89,20 @@ export class CoinListComponent {
           });
         } else {
           coinsFiltered = { ...coins };
-
-          forEach(coins, (coin: ListItem) => this.updateTagsFilters(coin));
         }
+
+        forEach(coins, (coin: ListItem, uid: string) => {
+          this.updateTagsFilters(coin);
+
+          if (
+            (this.onlyMarker === Checkboxes.wanted && !coinsFiltered[uid].isWanted) ||
+            (this.onlyMarker === Checkboxes.replace && !coinsFiltered[uid].isReplace) ||
+            (this.onlyMarker === Checkboxes.deleted && !coinsFiltered[uid].isDeleted) ||
+            (this.onlyMarker === Checkboxes.delivery && !coinsFiltered[uid].isWaiting)
+          ) {
+            delete coinsFiltered[uid];
+          }
+        });
 
         coinsFiltered = filterObjectByValue<any>(coinsFiltered, (coin) => {
           return (this.isWanted ? true : !coin.isWanted) && (this.isDeleted ? true : !coin.isDeleted);
@@ -201,6 +214,20 @@ export class CoinListComponent {
     event.preventDefault();
   }
 
+  public selectOnly(marker: Checkboxes): void {
+    const value = localStorage.getItem('selectOnly') === marker ? '' : marker;
+    localStorage.setItem('selectOnly', value);
+    this.filtered$.next(true);
+  }
+
+  public trackByKey(index: number, item: { key: string; value: any }): string {
+    return item.key;
+  }
+
+  public get onlyMarker(): string | null {
+    return localStorage.getItem('selectOnly');
+  }
+
   public get selectedTag(): Tags {
     const tag = localStorage.getItem(TagKeys.tag);
     const set = localStorage.getItem(TagKeys.set);
@@ -212,6 +239,7 @@ export class CoinListComponent {
   public set isWanted(event: any) {
     const isChecked = event.target.checked;
     localStorage.setItem('isWanted', isChecked ? 'true' : '');
+    isChecked ? null : localStorage.setItem('selectOnly', '');
     this.filtered$.next(true);
   }
 
@@ -222,6 +250,7 @@ export class CoinListComponent {
   public set isWaiting(event: any) {
     const isChecked = event.target.checked;
     localStorage.setItem('isWaiting', isChecked ? 'true' : '');
+    isChecked ? null : localStorage.setItem('selectOnly', '');
     this.filtered$.next(true);
   }
 
@@ -232,6 +261,7 @@ export class CoinListComponent {
   public set isReplace(event: any) {
     const isChecked = event.target.checked;
     localStorage.setItem('isReplace', isChecked ? 'true' : '');
+    isChecked ? null : localStorage.setItem('selectOnly', '');
     this.filtered$.next(true);
   }
 
@@ -242,6 +272,7 @@ export class CoinListComponent {
   public set isDeleted(event: any) {
     const isChecked = event.target.checked;
     localStorage.setItem('isDeleted', isChecked ? 'true' : '');
+    isChecked ? null : localStorage.setItem('selectOnly', '');
     this.filtered$.next(true);
   }
 

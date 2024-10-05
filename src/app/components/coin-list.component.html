@@ -26,7 +26,7 @@
   </div>
 
   <ul class="coins-list" #imagesContainer>
-    <li *ngFor="let item of coinsFiltered$ | async | keyvalue : sortCoinsList; let index = index">
+    <li *ngFor="let item of coinsFiltered$ | async | keyvalue : sortCoinsList; trackBy: trackByKey; let index = index">
       <ng-container *ngIf="item.value as coin">
         <figure (click)="openCoin(item.key)" [class.wanted]="item.value.isWanted">
           <img *ngIf="coin.isReplace && isReplace" class="replace-icon" src="assets/replace.png" alt="replace" />
@@ -61,21 +61,33 @@
     <p class="mr-10 text-right">
       <input id="isWanted" type="checkbox" [checked]="isWanted" (change)="isWanted = $event" />
       <label for="isWanted">Wanted</label>
+      <a (click)="selectOnly(Checkboxes.wanted)"
+        ><img [class.checked]="onlyMarker === Checkboxes.wanted" src="assets/lock.png" alt=""
+      /></a>
     </p>
 
     <p class="mr-10 text-right">
       <input id="isWaiting" type="checkbox" [checked]="isWaiting" (change)="isWaiting = $event" />
       <label for="isWaiting">In delivery</label>
+      <a (click)="selectOnly(Checkboxes.delivery)"
+        ><img [class.checked]="onlyMarker === Checkboxes.delivery" src="assets/lock.png" alt=""
+      /></a>
     </p>
 
     <p class="mr-10 text-right">
       <input id="isReplace" type="checkbox" [checked]="isReplace" (change)="isReplace = $event" />
       <label for="isReplace">Need replace</label>
+      <a (click)="selectOnly(Checkboxes.replace)"
+        ><img [class.checked]="onlyMarker === Checkboxes.replace" src="assets/lock.png" alt=""
+      /></a>
     </p>
 
     <p class="mr-10 text-right">
       <input id="isDeleted" type="checkbox" [checked]="isDeleted" (change)="isDeleted = $event" />
       <label for="isDeleted">Deleted</label>
+      <a (click)="selectOnly(Checkboxes.deleted)"
+        ><img [class.checked]="onlyMarker === Checkboxes.deleted" src="assets/lock.png" alt=""
+      /></a>
     </p>
   </div>
 </div>

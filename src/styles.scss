@@ -460,6 +460,22 @@ input[type='checkbox'] {
   right: 50px;
   position: absolute;
 
+  a img {
+    opacity: 0.1;
+    width: 12px;
+    height: 15px;
+    cursor: pointer;
+    margin-left: 10px;
+
+    &.checked {
+      opacity: 1;
+    }
+  }
+
+  input:not(:checked) ~ a img {
+    display: none;
+  }
+
   @media (max-width: 700px) {
     top: 0;
     display: flex;
