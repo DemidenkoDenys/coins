@@ -70,24 +70,6 @@
     </fieldset>
 
     <input #file type="file" formControlName="image" (change)="onImageChange($event)" /><br />
-
-    <image-cropper
-      *ngIf="imageChangedEvent"
-      #imageCropper
-      format="jpeg"
-      [autoCrop]="true"
-      [(transform)]="transform"
-      [imageQuality]="50"
-      [roundCropper]="true"
-      [onlyScaleDown]="true"
-      [resizeToWidth]="500"
-      [resizeToHeight]="500"
-      [allowMoveImage]="true"
-      [initialStepSize]="0"
-      [imageChangedEvent]="imageChangedEvent"
-      [maintainAspectRatio]="true"
-      (imageCropped)="onImageCropped($event)"
-    ></image-cropper>
   </ng-container>
 
   <!-- tags controllers -->
@@ -146,3 +128,19 @@
     </p>
   </ng-container>
 </form>
+
+<image-cropper
+  *ngIf="imageChangedEvent"
+  #imageCropper
+  format="jpeg"
+  [autoCrop]="true"
+  [(transform)]="transform"
+  [imageQuality]="50"
+  [roundCropper]="true"
+  [onlyScaleDown]="true"
+  [allowMoveImage]="true"
+  [initialStepSize]="0"
+  [imageChangedEvent]="imageChangedEvent"
+  [maintainAspectRatio]="true"
+  (imageCropped)="onImageCropped($event)"
+></image-cropper>

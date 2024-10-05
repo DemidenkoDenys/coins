@@ -142,12 +142,9 @@ export class CoinComponent {
         if (coin.uid) {
           this.coinUID = coin.uid;
           this.images = coin.images.map(() => ({ url: 'assets/placeholder.png' }));
+          this.imagePrimaryIndex = this.images.length > 0 ? 0 : null;
+          this.imageSecondaryIndex = this.images.length > 1 ? 1 : null;
           this.form.patchValue(coin);
-
-          if (coin.images.length === 1) {
-            this.imagePrimaryIndex = 0;
-          }
-
           coin.images.forEach((image, index) => this.data.getImageUrl(image).subscribe((url) => (this.images[index] = { url })));
         }
       });
@@ -225,6 +222,26 @@ export class CoinComponent {
     }
   }
 
+  enterNewImage(event: any) {
+    if (this.image) {
+      event.preventDefault();
+
+      if (this.imagePrimaryIndex === this.imageCurrentIndex) {
+        this.imagePrimaryIndex = null;
+      }
+
+      if (this.imageSecondaryIndex === this.imageCurrentIndex) {
+        this.imageSecondaryIndex = null;
+      }
+
+      const index = this.imageCurrentIndex ?? this.images.length;
+      this.images[index] = this.image;
+      this.form.controls.image.reset();
+      this.form.controls.image.markAsDirty();
+      this.image = null;
+    }
+  }
+
   onImageChange(event: Event): void {
     this.imageChangedEvent = event;
   }
@@ -275,6 +292,15 @@ export class CoinComponent {
   @HostListener('document:touchend', ['$event'])
   @HostListener('document:mouseup', ['$event'])
   onMouseUp(event: any) {
+    this.closeExpandedImage(event);
+  }
+
+  @HostListener('document:contextmenu', ['$event'])
+  onContextMenu(event: any) {
+    event.preventDefault();
+  }
+
+  closeExpandedImage(event: any) {
     if (this.imageExpandTimeout) {
       event.preventDefault();
       clearTimeout(this.imageExpandTimeout);
@@ -287,11 +313,6 @@ export class CoinComponent {
     }
   }
 
-  @HostListener('document:contextmenu', ['$event'])
-  onContextMenu(event: any) {
-    event.preventDefault();
-  }
-
   onDeleteImageClick(index: number): void {
     this.images[index] = { url: '' };
     if (this.imagePrimaryIndex === index) this.imagePrimaryIndex = null;
@@ -301,23 +322,44 @@ export class CoinComponent {
 
   updateFirebaseImages(): Observable<any> {
     const images$: Array<Observable<any>> = [];
-    const images = this.form.value.images ?? [];
+    const initImages = this.form.value.images ?? [];
 
-    let maxIndex = max(images.map((name) => +name.split('-')[1].replace('.png', ''))) ?? 0;
+    let maxIndex = max(initImages.map((name) => +name.split('-')[1].replace('.png', ''))) ?? 0;
 
     forEach(this.images, (image, index) => {
       if (image.blob) {
         const name = this.coinUID + '-' + ++maxIndex + '.png';
         images$.push(this.data.uploadImage$(image.blob, name));
-      } else if (images[index]) {
-        images$.push(image.url ? of({ metadata: { name: images[index] } }) : this.data.deleteImage$(images[index]));
+      } else if (initImages[index]) {
+        images$.push(image.url ? of({ metadata: { name: initImages[index] } }) : this.data.deleteImage$(initImages[index]));
       }
     });
 
     return forkJoin(images$).pipe(
       switchMap((snapshots) => {
         const images: Array<string> = [];
-        forEach(snapshots, (s, index) => (s ? images.push(s.metadata.name) : this.images.splice(index, 1)));
+        const imageNames: Array<string> = [];
+
+        let primaryName: string;
+        let secondaryName: string;
+
+        forEach(snapshots, (snapshot, index) => {
+          if (snapshot) {
+            if (this.imagePrimaryIndex === index) primaryName = snapshot.metadata.name;
+            if (this.imageSecondaryIndex === index) secondaryName = snapshot.metadata.name;
+            imageNames.push(snapshot.metadata.name);
+          } else {
+            this.images.splice(index, 1);
+          }
+        });
+
+        // set primary image
+        forEach(imageNames, (name) => (name === primaryName ? images.push(name) : null));
+        // set secondary image
+        forEach(imageNames, (name) => (name === secondaryName ? images.push(name) : null));
+        // set another images
+        forEach(imageNames, (name) => (name !== secondaryName && name !== primaryName ? images.push(name) : null));
+
         this.form.controls.images.setValue(images);
         return this.collection$.doc(this.coinUID).update({ images });
       })
@@ -449,20 +491,14 @@ export class CoinComponent {
 
   @HostListener('document:keydown.enter', ['$event'])
   onEnter(event: KeyboardEvent): void {
-    if (this.image) {
-      event.preventDefault();
-
-      const index = this.imageCurrentIndex ?? this.images.length;
-      this.images[index] = this.image;
-      this.form.controls.image.reset();
-      this.form.controls.image.markAsDirty();
-      this.image = null;
-    }
+    this.enterNewImage(event);
   }
 
   @HostListener('document:keydown.escape', ['$event'])
   onEscape(event: KeyboardEvent): void {
     event.preventDefault();
+
+    this.closeExpandedImage(event);
 
     if (this.image) {
       this.form.controls.image.reset();
