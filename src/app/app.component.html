@@ -3,6 +3,7 @@
 </button>
 
 <ng-container *ngIf="auth.user | async">
+  <button class="backup-btn" (click)="backup()">backup</button>
   <button class="logout-btn" (click)="logout()">logout</button>
   <router-outlet *ngIf="auth.user | async"></router-outlet>
 </ng-container>

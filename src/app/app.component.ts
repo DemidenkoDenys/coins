@@ -19,6 +19,7 @@ import { DataService } from './services/data.service';
 })
 export class AppComponent {
   user: firebase.User | null = null;
+  backupData: any = {};
 
   constructor(
     public readonly auth: AngularFireAuth,
@@ -37,10 +38,12 @@ export class AppComponent {
               collections.forEach((collection: any) => {
                 if (collection.id === 'metadata') {
                   meta = collection.data();
+                  this.backupData.metadata = collection.data();
                 }
 
                 if (collection.id.length > 15) {
                   const coin = collection.data();
+                  this.backupData[collection.id] = coin;
                   coins[collection.id] = {
                     ...coin,
                     tags: parseTags(coin.tags),
@@ -79,6 +82,17 @@ export class AppComponent {
           ? this.store.dispatch(UserActions.update(user))
           : this.store.dispatch(UserActions.reset())
       );
+  }
+
+  backup(): void {
+    const jsonStr = JSON.stringify(this.backupData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'data.json';
+    a.click();
+    window.URL.revokeObjectURL(url);
   }
 
   login() {

@@ -93,12 +93,13 @@ export class CoinListComponent {
 
         forEach(coins, (coin: ListItem, uid: string) => {
           this.updateTagsFilters(coin);
+          const filtered = coinsFiltered[uid];
 
           if (
-            (this.onlyMarker === Checkboxes.wanted && !coinsFiltered[uid].isWanted) ||
-            (this.onlyMarker === Checkboxes.replace && !coinsFiltered[uid].isReplace) ||
-            (this.onlyMarker === Checkboxes.deleted && !coinsFiltered[uid].isDeleted) ||
-            (this.onlyMarker === Checkboxes.delivery && !coinsFiltered[uid].isWaiting)
+            (this.onlyMarker === Checkboxes.wanted && filtered && !filtered.isWanted) ||
+            (this.onlyMarker === Checkboxes.replace && filtered && !filtered.isReplace) ||
+            (this.onlyMarker === Checkboxes.deleted && filtered && !filtered.isDeleted) ||
+            (this.onlyMarker === Checkboxes.delivery && filtered && !filtered.isWaiting)
           ) {
             delete coinsFiltered[uid];
           }

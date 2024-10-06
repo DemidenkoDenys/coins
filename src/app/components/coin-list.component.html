@@ -58,7 +58,7 @@
   </ul>
 
   <div class="checkboxes">
-    <p class="mr-10 text-right">
+    <p class="text-right no-wrap">
       <input id="isWanted" type="checkbox" [checked]="isWanted" (change)="isWanted = $event" />
       <label for="isWanted">Wanted</label>
       <a (click)="selectOnly(Checkboxes.wanted)"
@@ -66,7 +66,7 @@
       /></a>
     </p>
 
-    <p class="mr-10 text-right">
+    <p class="text-right no-wrap">
       <input id="isWaiting" type="checkbox" [checked]="isWaiting" (change)="isWaiting = $event" />
       <label for="isWaiting">In delivery</label>
       <a (click)="selectOnly(Checkboxes.delivery)"
@@ -74,7 +74,7 @@
       /></a>
     </p>
 
-    <p class="mr-10 text-right">
+    <p class="text-right no-wrap">
       <input id="isReplace" type="checkbox" [checked]="isReplace" (change)="isReplace = $event" />
       <label for="isReplace">Need replace</label>
       <a (click)="selectOnly(Checkboxes.replace)"
@@ -82,7 +82,7 @@
       /></a>
     </p>
 
-    <p class="mr-10 text-right">
+    <p class="text-right no-wrap">
       <input id="isDeleted" type="checkbox" [checked]="isDeleted" (change)="isDeleted = $event" />
       <label for="isDeleted">Deleted</label>
       <a (click)="selectOnly(Checkboxes.deleted)"

@@ -101,15 +101,6 @@
     ></tags>
   </ng-container>
 
-  <!-- action buttons -->
-  <div class="coin-buttons">
-    <button [disabled]="coinUID || form.pristine" (click)="createCoin()" class="mr-10">Create</button>
-
-    <button [disabled]="!coinUID || form.pristine" (click)="editCoin()" class="mr-10">Save</button>
-
-    <button [disabled]="!coinUID" (click)="deleteCoin()" class="ml-auto">Delete</button>
-  </div>
-
   <!-- state checkboxes -->
   <ng-container>
     <p class="mr-10 text-center">
@@ -127,6 +118,13 @@
       <label for="isReplace">Replace it</label>
     </p>
   </ng-container>
+
+  <!-- action buttons -->
+  <div class="coin-buttons">
+    <button [disabled]="coinUID || form.pristine" (click)="createCoin()" class="mr-10">Create</button>
+    <button [disabled]="!coinUID || form.pristine" (click)="editCoin()" class="mr-10">Save</button>
+    <button [disabled]="!coinUID" (click)="deleteCoin()" class="ml-auto">Delete</button>
+  </div>
 </form>
 
 <image-cropper
