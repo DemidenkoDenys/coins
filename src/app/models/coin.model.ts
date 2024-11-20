@@ -19,6 +19,7 @@ export interface Coin {
   isReplace?: boolean;
   isDeleted?: boolean;
   isWaiting?: boolean;
+  missingData?: string;
   denomination: number;
 }
 

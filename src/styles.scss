@@ -236,6 +236,16 @@ figure.clone {
       border-radius: 0;
       position: absolute;
     }
+
+    .exclamation-icon {
+      top: -10px;
+      right: 5px;
+      width: 10px;
+      height: 25px;
+      border-radius: 0;
+      position: absolute;
+      object-fit: contain;
+    }
   }
 
   figcaption {
@@ -313,13 +323,12 @@ figure.clone {
 }
 
 p:has(mark) {
-  gap: 10px;
+  gap: 5px;
   margin: 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
   list-style: none;
-  margin-bottom: 10px;
 
   strong:not(:empty) {
     width: 30px;
@@ -440,6 +449,14 @@ mark.country {
 
 .mr-10 {
   margin-right: 10px;
+}
+
+.mt-10 {
+  margin-top: 10px;
+}
+
+.mt-5 {
+  margin-top: 5px;
 }
 
 .ml-auto {

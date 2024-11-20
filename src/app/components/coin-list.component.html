@@ -6,14 +6,6 @@
     <sup>{{ amount }}</sup>
 
     <div class="tags-search-options">
-      <tags type="tag" [items]="tags" [togglable]="true" [selectedItems]="selectedTag" (toggled)="toggleTag('tag', $event)"></tags>
-
-      <br />
-
-      <tags type="set" [items]="sets" [togglable]="true" [selectedItems]="selectedTag" (toggled)="toggleTag('set', $event)"></tags>
-
-      <br />
-
       <tags
         type="country"
         [items]="countries"
@@ -22,16 +14,31 @@
         [selectedItems]="selectedTag"
         (toggled)="toggleTag('country', $event)"
       ></tags>
+
+      <br />
+
+      <tags type="tag" [items]="tags" [togglable]="true" [selectedItems]="selectedTag" (toggled)="toggleTag('tag', $event)"></tags>
+
+      <br />
+
+      <tags type="set" [items]="sets" [togglable]="true" [selectedItems]="selectedTag" (toggled)="toggleTag('set', $event)"></tags>
     </div>
   </div>
 
   <ul class="coins-list" #imagesContainer>
     <li *ngFor="let item of coinsFiltered$ | async | keyvalue : sortCoinsList; trackBy: trackByKey; let index = index">
       <ng-container *ngIf="item.value as coin">
-        <figure (click)="openCoin(item.key)" [class.wanted]="item.value.isWanted">
-          <img *ngIf="coin.isReplace && isReplace" class="replace-icon" src="assets/replace.png" alt="replace" />
+        <figure (click)="openCoin(item.key)" [class.wanted]="item.value.isWanted && onlyMarker !== 'wanted' && !isFlag(Flag.isEuroSetNeed)">
+          <img *ngIf="coin.isReplace && isFlag(Flag.isReplace)" class="replace-icon" src="assets/replace.png" alt="replace" />
+          <img *ngIf="coin.isWaiting && isFlag(Flag.isDelivery)" class="delivery-icon" src="assets/delivery.png" alt="delivery" />
 
-          <img *ngIf="coin.isWaiting && isWaiting" class="delivery-icon" src="assets/delivery.png" alt="delivery" />
+          <img
+            *ngIf="coin.missingData && isFlag(Flag.isMissing)"
+            class="exclamation-icon"
+            src="assets/exclamation.png"
+            alt="missing data"
+            [lcTooltip]="coin.missingData"
+          />
 
           <img
             [attr.src]="coin.primaryImage || placeholderImage"
@@ -52,6 +59,14 @@
             <tags type="set" [items]="coin.matchedBy.sets"></tags>
             <tags type="country" [items]="coin.matchedBy.country" [formatter]="formatCountry"></tags>
           </div>
+
+          <div *ngIf="isFlag(Flag.showTags) && coin.tags" class="mt-5 center">
+            <tags type="tag" [items]="coin.tags"></tags>
+          </div>
+
+          <div *ngIf="isFlag(Flag.showSets) && coin.sets" class="mt-5 center">
+            <tags type="set" [items]="coin.sets"></tags>
+          </div>
         </figure>
       </ng-container>
     </li>
@@ -59,15 +74,13 @@
 
   <div class="checkboxes">
     <p class="text-right no-wrap">
-      <input id="isWanted" type="checkbox" [checked]="isWanted" (change)="isWanted = $event" />
+      <input id="isWanted" type="checkbox" [checked]="isWanted" [disabled]="isFlag(Flag.isEuroSetNeed)" (change)="isWanted = $event" />
       <label for="isWanted">Wanted</label>
-      <a (click)="selectOnly(Checkboxes.wanted)"
-        ><img [class.checked]="onlyMarker === Checkboxes.wanted" src="assets/lock.png" alt=""
-      /></a>
+      <a (click)="selectOnly(Checkboxes.wanted)"><img [class.checked]="onlyMarker === Checkboxes.wanted" src="assets/lock.png" alt="" /></a>
     </p>
 
     <p class="text-right no-wrap">
-      <input id="isWaiting" type="checkbox" [checked]="isWaiting" (change)="isWaiting = $event" />
+      <input id="isWaiting" type="checkbox" [checked]="isWaiting" [disabled]="isFlag(Flag.isEuroSetNeed)" (change)="isWaiting = $event" />
       <label for="isWaiting">In delivery</label>
       <a (click)="selectOnly(Checkboxes.delivery)"
         ><img [class.checked]="onlyMarker === Checkboxes.delivery" src="assets/lock.png" alt=""
@@ -75,7 +88,7 @@
     </p>
 
     <p class="text-right no-wrap">
-      <input id="isReplace" type="checkbox" [checked]="isReplace" (change)="isReplace = $event" />
+      <input id="isReplace" type="checkbox" [checked]="isReplace" [disabled]="isFlag(Flag.isEuroSetNeed)" (change)="isReplace = $event" />
       <label for="isReplace">Need replace</label>
       <a (click)="selectOnly(Checkboxes.replace)"
         ><img [class.checked]="onlyMarker === Checkboxes.replace" src="assets/lock.png" alt=""
@@ -83,11 +96,54 @@
     </p>
 
     <p class="text-right no-wrap">
-      <input id="isDeleted" type="checkbox" [checked]="isDeleted" (change)="isDeleted = $event" />
+      <input id="isDeleted" type="checkbox" [checked]="isDeleted" [disabled]="isFlag(Flag.isEuroSetNeed)" (change)="isDeleted = $event" />
       <label for="isDeleted">Deleted</label>
       <a (click)="selectOnly(Checkboxes.deleted)"
         ><img [class.checked]="onlyMarker === Checkboxes.deleted" src="assets/lock.png" alt=""
       /></a>
+    </p>
+
+    <p class="text-right no-wrap">
+      <input
+        [id]="Flag.showTags"
+        type="checkbox"
+        [checked]="isFlag(Flag.showTags)"
+        [disabled]="isFlag(Flag.isEuroSetNeed)"
+        (change)="setFlag(Flag.showTags, $any($event.target).checked)"
+      />
+      <label [for]="Flag.showTags">Tags</label>
+    </p>
+
+    <p class="text-right no-wrap">
+      <input
+        [id]="Flag.showSets"
+        type="checkbox"
+        [checked]="isFlag(Flag.showSets)"
+        [disabled]="isFlag(Flag.isEuroSetNeed)"
+        (change)="setFlag(Flag.showSets, $any($event.target).checked)"
+      />
+      <label [for]="Flag.showSets">Sets</label>
+    </p>
+
+    <p class="text-right no-wrap">
+      <input
+        [id]="Flag.isMissing"
+        type="checkbox"
+        [checked]="isFlag(Flag.isMissing)"
+        [disabled]="isFlag(Flag.isEuroSetNeed)"
+        (change)="setFlag(Flag.isMissing, $any($event.target).checked)"
+      />
+      <label [for]="Flag.isMissing">Show missing data</label>
+    </p>
+
+    <p class="text-right no-wrap">
+      <input
+        [id]="Flag.isEuroSetNeed"
+        type="checkbox"
+        [checked]="isFlag(Flag.isEuroSetNeed)"
+        (change)="setFlag(Flag.isEuroSetNeed, $any($event.target).checked)"
+      />
+      <label [for]="Flag.isEuroSetNeed">Euro set need</label>
     </p>
   </div>
 </div>

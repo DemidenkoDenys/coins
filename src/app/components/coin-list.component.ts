@@ -4,9 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { of, map, Observable, combineLatest, BehaviorSubject } from 'rxjs';
 import { Store, StoreModule } from '@ngrx/store';
-import { forEach, isEmpty, toLower } from 'lodash-es';
+import { find, forEach, isEmpty, keys, toLower } from 'lodash-es';
+import { TooltipDirective } from '@babybeet/angular-tooltip';
 
 import { Tags } from '../models/tags.type';
+import { Flag } from '../enums/flags.enum';
 import { TagKeys } from '../enums/tag-keys.enum';
 import { InPipe } from '../pipe/in.pipe';
 import { MatchBy } from '../models/match-by.model';
@@ -24,12 +26,13 @@ import { cloneImageAndExpand } from '../utils/html.utils';
 
 @Component({
   selector: 'coin-list',
-  imports: [NgIf, InPipe, NgForOf, JsonPipe, AsyncPipe, FormsModule, KeyValuePipe, TagsComponent],
+  imports: [NgIf, InPipe, NgForOf, JsonPipe, AsyncPipe, FormsModule, KeyValuePipe, TagsComponent, TooltipDirective],
   providers: [StoreModule],
   standalone: true,
   templateUrl: 'coin-list.component.html',
 })
 export class CoinListComponent {
+  public readonly Flag = Flag;
   public readonly wrap = wrapSubstring;
   public readonly Checkboxes = Checkboxes;
   public readonly toTitleCase = toTitleCase;
@@ -76,7 +79,7 @@ export class CoinListComponent {
             if (set && isDefined(coin.sets?.[set])) {
               coinsFiltered[uid] = coin;
               coinsFiltered[uid].matchedBy.tags = {};
-              coinsFiltered[uid].matchedBy.sets = { [set]: '' };
+              coinsFiltered[uid].matchedBy.sets = { [set]: set };
               coinsFiltered[uid].matchedBy.country = {};
             }
 
@@ -84,7 +87,7 @@ export class CoinListComponent {
               coinsFiltered[uid] = coin;
               coinsFiltered[uid].matchedBy.tags = {};
               coinsFiltered[uid].matchedBy.sets = {};
-              coinsFiltered[uid].matchedBy.country = { [country]: '' };
+              coinsFiltered[uid].matchedBy.country = { [country]: country };
             }
           });
         } else {
@@ -93,25 +96,34 @@ export class CoinListComponent {
 
         forEach(coins, (coin: ListItem, uid: string) => {
           this.updateTagsFilters(coin);
-          const filtered = coinsFiltered[uid];
+          const coined = coinsFiltered[uid];
 
-          if (
-            (this.onlyMarker === Checkboxes.wanted && filtered && !filtered.isWanted) ||
-            (this.onlyMarker === Checkboxes.replace && filtered && !filtered.isReplace) ||
-            (this.onlyMarker === Checkboxes.deleted && filtered && !filtered.isDeleted) ||
-            (this.onlyMarker === Checkboxes.delivery && filtered && !filtered.isWaiting)
-          ) {
-            delete coinsFiltered[uid];
+          if (this.isFlag(Flag.isEuroSetNeed)) {
+            const coinSets = keys(coined.sets).join('_');
+            const isEuroSetCoin = coinSets.includes('euro') && coinSets.includes('_cs');
+            if (coined && !(isEuroSetCoin && coin.isWanted)) {
+              delete coinsFiltered[uid];
+            }
+          } else {
+            if (
+              (this.onlyMarker === Checkboxes.wanted && coined && !coined.isWanted) ||
+              (this.onlyMarker === Checkboxes.replace && coined && !coined.isReplace) ||
+              (this.onlyMarker === Checkboxes.deleted && coined && !coined.isDeleted) ||
+              (this.onlyMarker === Checkboxes.delivery && coined && !coined.isWaiting)
+            ) {
+              delete coinsFiltered[uid];
+            }
           }
         });
 
         coinsFiltered = filterObjectByValue<any>(coinsFiltered, (coin) => {
-          return (this.isWanted ? true : !coin.isWanted) && (this.isDeleted ? true : !coin.isDeleted);
+          return this.isFlag(Flag.isEuroSetNeed)
+            ? !coin.isDeleted
+            : (this.isWanted ? true : !coin.isWanted) && (this.isDeleted ? true : !coin.isDeleted);
         });
 
         forEach(coinsFiltered, (coin: ListItem, uid: string) => {
           const text = toLower(search);
-
           const options = { key: search, lowerCase: true, checkIncludes: true };
           const matchedName = toLower(coin.name)?.includes(text);
           const matchedTags = keysBy(coin.tags, options);
@@ -130,7 +142,22 @@ export class CoinListComponent {
           }
         });
 
+        forEach(coinsFiltered, (coin: ListItem, uid: string) => {
+          const missingData = [];
+
+          if (!coin.year && !coin.isWanted) {
+            missingData.push('No year');
+          }
+          if (!coin.country) {
+            missingData.push('No country');
+          }
+          if (missingData.length) {
+            coinsFiltered[uid] = { ...coin, missingData: missingData.join('\n') };
+          }
+        });
+
         this.amount = Object.keys(coinsFiltered).length;
+
         return coinsFiltered;
       })
     );
@@ -153,9 +180,19 @@ export class CoinListComponent {
   }
 
   public sortCoinsList = (a: KeyValue<string, ListItem>, b: KeyValue<string, ListItem>): number => {
-    return a.value.denomination !== b.value.denomination
-      ? a.value.denomination - b.value.denomination
-      : a.value.name.localeCompare(b.value.name);
+    console.log('a:', a);
+    const aSet = find(keys(a.value.sets), (st) => st.includes('cs')) ?? '';
+    const bSet = find(keys(b.value.sets), (st) => st.includes('cs')) ?? '';
+
+    return aSet && bSet
+      ? aSet !== bSet
+        ? aSet.localeCompare(bSet)
+        : a.value.denomination !== b.value.denomination
+        ? a.value.denomination - b.value.denomination
+        : a.value.name.localeCompare(b.value.name)
+      : aSet && !bSet
+      ? -1
+      : 1;
   };
 
   public toggleTag(property: keyof typeof TagKeys, value: string): void {
@@ -216,6 +253,8 @@ export class CoinListComponent {
   }
 
   public selectOnly(marker: Checkboxes): void {
+    if (this.isFlag(Flag.isEuroSetNeed)) return;
+
     const value = localStorage.getItem('selectOnly') === marker ? '' : marker;
     localStorage.setItem('selectOnly', value);
     this.filtered$.next(true);
@@ -279,5 +318,26 @@ export class CoinListComponent {
 
   public get isDeleted(): boolean {
     return localStorage.getItem('isDeleted') === 'true';
+  }
+
+  public set isTags(event: any) {
+    const isChecked = event.target.checked;
+    localStorage.setItem('isTags', isChecked ? 'true' : '');
+    isChecked ? null : localStorage.setItem('selectOnly', '');
+    this.filtered$.next(true);
+  }
+
+  public get isTags(): boolean {
+    return localStorage.getItem('isTags') === 'true';
+  }
+
+  public setFlag(flag: Flag, checked: boolean) {
+    localStorage.setItem(flag, checked ? 'true' : '');
+    checked ? null : localStorage.setItem('selectOnly', '');
+    this.filtered$.next(true);
+  }
+
+  public isFlag(flag: Flag): boolean {
+    return localStorage.getItem(flag) === 'true';
   }
 }
