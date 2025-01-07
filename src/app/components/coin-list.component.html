@@ -28,7 +28,7 @@
   <ul class="coins-list" #imagesContainer>
     <li *ngFor="let item of coinsFiltered$ | async | keyvalue : sortCoinsList; trackBy: trackByKey; let index = index">
       <ng-container *ngIf="item.value as coin">
-        <figure (click)="openCoin(item.key)" [class.wanted]="item.value.isWanted && onlyMarker !== 'wanted' && !isFlag(Flag.isEuroSetNeed)">
+        <figure (click)="openCoin(item.key)" [class.wanted]="item.value.isWanted && onlyMarker !== 'wanted' && !isFlag(Flag.isEuroSetNeed) && !isFlag(Flag.isEuroCCNeed)">
           <img *ngIf="coin.isReplace && isFlag(Flag.isReplace)" class="replace-icon" src="assets/replace.png" alt="replace" />
           <img *ngIf="coin.isWaiting && isFlag(Flag.isDelivery)" class="delivery-icon" src="assets/delivery.png" alt="delivery" />
 
@@ -51,7 +51,9 @@
           </ng-container>
 
           <ng-template #plainName>
-            <figcaption>{{ coin.name }}</figcaption>
+            <figcaption>
+              {{ coin.name }} <span class="coin-year" *ngIf="coin.year">{{ coin.year }}</span>
+            </figcaption>
           </ng-template>
 
           <div class="center">
@@ -136,14 +138,26 @@
       <label [for]="Flag.isMissing">Show missing data</label>
     </p>
 
+    <br />
+
     <p class="text-right no-wrap">
       <input
-        [id]="Flag.isEuroSetNeed"
         type="checkbox"
+        [id]="Flag.isEuroSetNeed"
         [checked]="isFlag(Flag.isEuroSetNeed)"
         (change)="setFlag(Flag.isEuroSetNeed, $any($event.target).checked)"
       />
       <label [for]="Flag.isEuroSetNeed">Euro set need</label>
+    </p>
+
+    <p class="text-right no-wrap">
+      <input
+        type="checkbox"
+        [id]="Flag.isEuroCCNeed"
+        [checked]="isFlag(Flag.isEuroCCNeed)"
+        (change)="setFlag(Flag.isEuroCCNeed, $any($event.target).checked)"
+      />
+      <label [for]="Flag.isEuroCCNeed">Commemorative need</label>
     </p>
   </div>
 </div>

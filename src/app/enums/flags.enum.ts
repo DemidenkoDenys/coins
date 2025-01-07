@@ -5,5 +5,6 @@ export enum Flag {
   isMissing = 'isMissing',
   isReplace = 'isReplace',
   isDelivery = 'isDelivery',
+  isEuroCCNeed = 'isEuroCCNeed',
   isEuroSetNeed = 'isEuroSetNeed',
 }

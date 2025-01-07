@@ -1,4 +1,4 @@
-import { NgIf, NgForOf, JsonPipe, AsyncPipe, KeyValuePipe, KeyValue } from '@angular/common';
+import { NgIf, NgForOf, AsyncPipe, KeyValuePipe, KeyValue } from '@angular/common';
 import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -10,7 +10,6 @@ import { TooltipDirective } from '@babybeet/angular-tooltip';
 import { Tags } from '../models/tags.type';
 import { Flag } from '../enums/flags.enum';
 import { TagKeys } from '../enums/tag-keys.enum';
-import { InPipe } from '../pipe/in.pipe';
 import { MatchBy } from '../models/match-by.model';
 import { AppState } from '../store/store.state';
 import { ListItem } from '../models/list-item.model';
@@ -23,10 +22,11 @@ import { ListSelectors } from '../store/list/list.store';
 import { MetaSelectors } from '../store/meta/meta.store';
 import { filterObjectByValue, keysBy } from '../utils/object.utils';
 import { cloneImageAndExpand } from '../utils/html.utils';
+import { Country } from '../enums/country.enum';
 
 @Component({
   selector: 'coin-list',
-  imports: [NgIf, InPipe, NgForOf, JsonPipe, AsyncPipe, FormsModule, KeyValuePipe, TagsComponent, TooltipDirective],
+  imports: [NgIf, NgForOf, AsyncPipe, FormsModule, KeyValuePipe, TagsComponent, TooltipDirective],
   providers: [StoreModule],
   standalone: true,
   templateUrl: 'coin-list.component.html',
@@ -99,10 +99,28 @@ export class CoinListComponent {
           const coined = coinsFiltered[uid];
 
           if (this.isFlag(Flag.isEuroSetNeed)) {
-            const coinSets = keys(coined.sets).join('_');
-            const isEuroSetCoin = coinSets.includes('euro') && coinSets.includes('_cs');
-            if (coined && !(isEuroSetCoin && coin.isWanted)) {
-              delete coinsFiltered[uid];
+            if (coined) {
+              const coinSets = keys(coined.sets).join('_');
+              const isEuroSetCoin = coinSets.includes('euro') && coinSets.includes('_cs');
+
+              if (!(isEuroSetCoin && coin.isWanted)) {
+                delete coinsFiltered[uid];
+              }
+            }
+          } else if (this.isFlag(Flag.isEuroCCNeed)) {
+            if (coined) {
+              const coinSets = keys(coined.sets).join('_');
+              const isEuroCommemorativeCoin = coinSets.includes('euro') && !coinSets.includes('_cs');
+
+              if (
+                !(isEuroCommemorativeCoin && coin.isWanted) ||
+                coined.country === Country.AND ||
+                coined.country === Country.MCO ||
+                coined.country === Country.SMR ||
+                coined.country === Country.VAT // temp
+              ) {
+                delete coinsFiltered[uid];
+              }
             }
           } else {
             if (
@@ -180,7 +198,6 @@ export class CoinListComponent {
   }
 
   public sortCoinsList = (a: KeyValue<string, ListItem>, b: KeyValue<string, ListItem>): number => {
-    console.log('a:', a);
     const aSet = find(keys(a.value.sets), (st) => st.includes('cs')) ?? '';
     const bSet = find(keys(b.value.sets), (st) => st.includes('cs')) ?? '';
 
@@ -192,6 +209,8 @@ export class CoinListComponent {
         : a.value.name.localeCompare(b.value.name)
       : aSet && !bSet
       ? -1
+      : !aSet && !bSet && a.value.year && b.value.year
+      ? a.value.year - b.value.year
       : 1;
   };
 
@@ -202,10 +221,14 @@ export class CoinListComponent {
   }
 
   private setFilterTag(type: keyof typeof TagKeys, filter: string): void {
+    this.resetFilters();
+    localStorage.setItem(type, filter);
+  }
+
+  private resetFilters(): void {
     localStorage.setItem(TagKeys.tag, '');
     localStorage.setItem(TagKeys.set, '');
     localStorage.setItem(TagKeys.country, '');
-    localStorage.setItem(type, filter);
   }
 
   public openCoin(coinUID: string): void {
@@ -334,6 +357,11 @@ export class CoinListComponent {
   public setFlag(flag: Flag, checked: boolean) {
     localStorage.setItem(flag, checked ? 'true' : '');
     checked ? null : localStorage.setItem('selectOnly', '');
+
+    if (checked && (flag === Flag.isEuroSetNeed || flag === Flag.isEuroCCNeed)) {
+      this.resetFilters();
+    }
+
     this.filtered$.next(true);
   }
 

@@ -1,5 +1,5 @@
 import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
-import { AsyncPipe, KeyValuePipe, NgForOf, NgIf } from '@angular/common';
+import { KeyValuePipe, NgForOf, NgIf } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormGroup, FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { forEach, isNil, last, max, omit } from 'lodash-es';
@@ -19,8 +19,6 @@ import { countries, grades } from '../static';
 import { toTitleCase } from '../utils/string.utils';
 import { Sets } from '../models/sets.type';
 import { Tags } from '../models/tags.type';
-import { InPipe } from '../pipe/in.pipe';
-import { NinPipe } from '../pipe/not-in.pipe';
 import { Image } from '../models/image.model';
 import { filterObjectByValue } from '../utils/object.utils';
 import { DataService } from '../services/data.service';
@@ -32,10 +30,7 @@ import { cloneImageAndExpand } from '../utils/html.utils';
   selector: 'coin',
   imports: [
     NgIf,
-    InPipe,
-    NinPipe,
     NgForOf,
-    AsyncPipe,
     FormsModule,
     KeyValuePipe,
     TagsComponent,
@@ -146,6 +141,12 @@ export class CoinComponent {
           this.imageSecondaryIndex = this.images.length > 1 ? 1 : null;
           this.form.patchValue(coin);
           coin.images.forEach((image, index) => this.data.getImageUrl(image).subscribe((url) => (this.images[index] = { url })));
+        // } else {
+        //   this.form.controls.name.setValue('2 euro - ');
+        //   this.form.controls.year.setValue(2024);
+        //   this.form.controls.denomination.setValue(2);
+        //   this.form.controls.sets.setValue({ euro: 'euro' });
+        //   this.form.controls.isWanted.setValue(true);
         }
       });
   }
