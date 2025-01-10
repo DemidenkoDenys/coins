@@ -1,14 +1,15 @@
-import { NgIf, NgForOf, AsyncPipe, KeyValuePipe, KeyValue } from '@angular/common';
+import { NgIf, NgForOf, AsyncPipe, KeyValue } from '@angular/common';
 import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { of, map, Observable, combineLatest, BehaviorSubject } from 'rxjs';
+import { of, map, Observable, combineLatest, BehaviorSubject, fromEvent, throttleTime } from 'rxjs';
 import { Store, StoreModule } from '@ngrx/store';
 import { find, forEach, isEmpty, keys, toLower } from 'lodash-es';
 import { TooltipDirective } from '@babybeet/angular-tooltip';
 
 import { Tags } from '../models/tags.type';
 import { Flag } from '../enums/flags.enum';
+import { Country } from '../enums/country.enum';
 import { TagKeys } from '../enums/tag-keys.enum';
 import { MatchBy } from '../models/match-by.model';
 import { AppState } from '../store/store.state';
@@ -22,11 +23,11 @@ import { ListSelectors } from '../store/list/list.store';
 import { MetaSelectors } from '../store/meta/meta.store';
 import { filterObjectByValue, keysBy } from '../utils/object.utils';
 import { cloneImageAndExpand } from '../utils/html.utils';
-import { Country } from '../enums/country.enum';
+import { LoadImageDirective } from '../directives/load-img.directive';
 
 @Component({
   selector: 'coin-list',
-  imports: [NgIf, NgForOf, AsyncPipe, FormsModule, KeyValuePipe, TagsComponent, TooltipDirective],
+  imports: [NgIf, NgForOf, AsyncPipe, FormsModule, TagsComponent, TooltipDirective, LoadImageDirective],
   providers: [StoreModule],
   standalone: true,
   templateUrl: 'coin-list.component.html',
@@ -42,12 +43,13 @@ export class CoinListComponent {
   public search$ = new BehaviorSubject<string>('');
   public filtered$ = new BehaviorSubject<any>(null);
   public tagSelected$ = new BehaviorSubject<MatchBy>(new MatchBy());
-  public coinsFiltered$: Observable<Record<string, ListItem>> = of({});
+  public coinsFiltered$: Observable<Array<ListItem>> = of([]);
 
   public sets: Tags = {};
   public tags: Tags = {};
   public amount: number = 0;
   public countries: Tags = {};
+  public windowInnerHeight!: number;
 
   @ViewChild('imagesContainer', { static: true }) imagesContainer!: ElementRef<HTMLDivElement>;
 
@@ -96,11 +98,11 @@ export class CoinListComponent {
 
         forEach(coins, (coin: ListItem, uid: string) => {
           this.updateTagsFilters(coin);
-          const coined = coinsFiltered[uid];
+          const coinFiltered = coinsFiltered[uid];
 
           if (this.isFlag(Flag.isEuroSetNeed)) {
-            if (coined) {
-              const coinSets = keys(coined.sets).join('_');
+            if (coinFiltered) {
+              const coinSets = keys(coinFiltered.sets).join('_');
               const isEuroSetCoin = coinSets.includes('euro') && coinSets.includes('_cs');
 
               if (!(isEuroSetCoin && coin.isWanted)) {
@@ -108,26 +110,26 @@ export class CoinListComponent {
               }
             }
           } else if (this.isFlag(Flag.isEuroCCNeed)) {
-            if (coined) {
-              const coinSets = keys(coined.sets).join('_');
+            if (coinFiltered) {
+              const coinSets = keys(coinFiltered.sets).join('_');
               const isEuroCommemorativeCoin = coinSets.includes('euro') && !coinSets.includes('_cs');
 
               if (
                 !(isEuroCommemorativeCoin && coin.isWanted) ||
-                coined.country === Country.AND ||
-                coined.country === Country.MCO ||
-                coined.country === Country.SMR ||
-                coined.country === Country.VAT // temp
+                coinFiltered.country === Country.AND ||
+                coinFiltered.country === Country.MCO ||
+                coinFiltered.country === Country.SMR ||
+                coinFiltered.country === Country.VAT // temp
               ) {
                 delete coinsFiltered[uid];
               }
             }
           } else {
             if (
-              (this.onlyMarker === Checkboxes.wanted && coined && !coined.isWanted) ||
-              (this.onlyMarker === Checkboxes.replace && coined && !coined.isReplace) ||
-              (this.onlyMarker === Checkboxes.deleted && coined && !coined.isDeleted) ||
-              (this.onlyMarker === Checkboxes.delivery && coined && !coined.isWaiting)
+              (this.onlyMarker === Checkboxes.wanted && coinFiltered && !coinFiltered.isWanted) ||
+              (this.onlyMarker === Checkboxes.replace && coinFiltered && !coinFiltered.isReplace) ||
+              (this.onlyMarker === Checkboxes.deleted && coinFiltered && !coinFiltered.isDeleted) ||
+              (this.onlyMarker === Checkboxes.delivery && coinFiltered && !coinFiltered.isWaiting)
             ) {
               delete coinsFiltered[uid];
             }
@@ -135,7 +137,7 @@ export class CoinListComponent {
         });
 
         coinsFiltered = filterObjectByValue<any>(coinsFiltered, (coin) => {
-          return this.isFlag(Flag.isEuroSetNeed)
+          return this.isFlag(Flag.isEuroSetNeed) || this.isFlag(Flag.isEuroCCNeed)
             ? !coin.isDeleted
             : (this.isWanted ? true : !coin.isWanted) && (this.isDeleted ? true : !coin.isDeleted);
         });
@@ -176,11 +178,41 @@ export class CoinListComponent {
 
         this.amount = Object.keys(coinsFiltered).length;
 
-        return coinsFiltered;
+        const sortedItems = Object.values(coinsFiltered).sort((a, b): number => {
+          const aSet = find(keys(a.sets), (st) => st.includes('cs')) ?? '';
+          const bSet = find(keys(b.sets), (st) => st.includes('cs')) ?? '';
+
+          return aSet && bSet
+            ? aSet !== bSet
+              ? aSet.localeCompare(bSet)
+              : a.denomination !== b.denomination
+              ? a.denomination - b.denomination
+              : a.name.localeCompare(b.name)
+            : aSet && !bSet
+            ? -1
+            : !aSet && !bSet && a.year && b.year
+            ? a.year - b.year
+            : 1;
+        });
+
+        setTimeout(() => (this.windowInnerHeight = Math.random()), 500);
+
+        return sortedItems.map((item, index) => {
+          const set = Object.keys(item.sets).find((set) => set.includes('_cs'));
+          const nextSets = sortedItems[index + 1]?.sets;
+          const isNextSameSet = set && index && nextSets && !(set in nextSets);
+          return isNextSameSet ? { ...item, wrap: true } : item;
+        });
       })
     );
 
     this.tagSelected$.next(new MatchBy());
+  }
+
+  ngOnInit() {
+    fromEvent(window, 'scroll')
+      .pipe(throttleTime(500))
+      .subscribe((event) => (this.windowInnerHeight = event.timeStamp));
   }
 
   private updateTagsFilters(coin: ListItem): void {
@@ -197,22 +229,22 @@ export class CoinListComponent {
     }
   }
 
-  public sortCoinsList = (a: KeyValue<string, ListItem>, b: KeyValue<string, ListItem>): number => {
-    const aSet = find(keys(a.value.sets), (st) => st.includes('cs')) ?? '';
-    const bSet = find(keys(b.value.sets), (st) => st.includes('cs')) ?? '';
+  // public sortCoinsList = (a: KeyValue<string, ListItem>, b: KeyValue<string, ListItem>): number => {
+  //   const aSet = find(keys(a.value.sets), (st) => st.includes('cs')) ?? '';
+  //   const bSet = find(keys(b.value.sets), (st) => st.includes('cs')) ?? '';
 
-    return aSet && bSet
-      ? aSet !== bSet
-        ? aSet.localeCompare(bSet)
-        : a.value.denomination !== b.value.denomination
-        ? a.value.denomination - b.value.denomination
-        : a.value.name.localeCompare(b.value.name)
-      : aSet && !bSet
-      ? -1
-      : !aSet && !bSet && a.value.year && b.value.year
-      ? a.value.year - b.value.year
-      : 1;
-  };
+  //   return aSet && bSet
+  //     ? aSet !== bSet
+  //       ? aSet.localeCompare(bSet)
+  //       : a.value.denomination !== b.value.denomination
+  //       ? a.value.denomination - b.value.denomination
+  //       : a.value.name.localeCompare(b.value.name)
+  //     : aSet && !bSet
+  //     ? -1
+  //     : !aSet && !bSet && a.value.year && b.value.year
+  //     ? a.value.year - b.value.year
+  //     : 1;
+  // };
 
   public toggleTag(property: keyof typeof TagKeys, value: string): void {
     const storageValue = localStorage.getItem(property);
@@ -352,6 +384,10 @@ export class CoinListComponent {
 
   public get isTags(): boolean {
     return localStorage.getItem('isTags') === 'true';
+  }
+
+  public get isFilteredByCountry(): boolean {
+    return !!localStorage.getItem(TagKeys.country);
   }
 
   public setFlag(flag: Flag, checked: boolean) {

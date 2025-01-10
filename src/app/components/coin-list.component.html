@@ -26,9 +26,12 @@
   </div>
 
   <ul class="coins-list" #imagesContainer>
-    <li *ngFor="let item of coinsFiltered$ | async | keyvalue : sortCoinsList; trackBy: trackByKey; let index = index">
-      <ng-container *ngIf="item.value as coin">
-        <figure (click)="openCoin(item.key)" [class.wanted]="item.value.isWanted && onlyMarker !== 'wanted' && !isFlag(Flag.isEuroSetNeed) && !isFlag(Flag.isEuroCCNeed)">
+    <ng-container *ngFor="let coin of coinsFiltered$ | async; let index = index">
+      <li>
+        <figure
+          (click)="openCoin(coin.uid)"
+          [class.wanted]="coin.isWanted && onlyMarker !== 'wanted' && !isFlag(Flag.isEuroSetNeed) && !isFlag(Flag.isEuroCCNeed)"
+        >
           <img *ngIf="coin.isReplace && isFlag(Flag.isReplace)" class="replace-icon" src="assets/replace.png" alt="replace" />
           <img *ngIf="coin.isWaiting && isFlag(Flag.isDelivery)" class="delivery-icon" src="assets/delivery.png" alt="delivery" />
 
@@ -40,8 +43,10 @@
             [lcTooltip]="coin.missingData"
           />
 
+          <!-- [attr.src]="coin.primaryImage || placeholderImage" -->
           <img
-            [attr.src]="coin.primaryImage || placeholderImage"
+            [height]="windowInnerHeight"
+            [loadImage]="coin.images[0]"
             (mousedown)="onImageMousedown($event, index)"
             (touchstart)="onImageMousedown($event, index)"
           />
@@ -70,8 +75,10 @@
             <tags type="set" [items]="coin.sets"></tags>
           </div>
         </figure>
-      </ng-container>
-    </li>
+      </li>
+
+      <li *ngIf="isFilteredByCountry && coin.wrap" class="sets-divider"></li>
+    </ng-container>
   </ul>
 
   <div class="checkboxes">

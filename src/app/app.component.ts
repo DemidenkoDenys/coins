@@ -46,15 +46,16 @@ export class AppComponent {
                   this.backupData[collection.id] = coin;
                   coins[collection.id] = {
                     ...coin,
+                    uid: collection.id,
                     tags: parseTags(coin.tags),
                     sets: parseTags(coin.sets),
                     matchedBy: {},
                   };
                   const image = coin.images && coin.images[0];
 
-                  images$[collection.id] = image
-                    ? this.data.getImageUrl(image)
-                    : of('');
+                  // images$[collection.id] = image
+                  //   ? this.data.getImageUrl(image)
+                  //   : of('');
                 }
               });
 
@@ -62,9 +63,9 @@ export class AppComponent {
                 this.data.updateMetadata(user.uid, new MetaState());
               }
 
-              forkJoin(images$).subscribe((images) => {
-                this.store.dispatch(ListActions.setPrimaryImages(images));
-              });
+              // forkJoin(images$).subscribe((images) => {
+              //   this.store.dispatch(ListActions.setPrimaryImages(images));
+              // });
 
               if (meta) {
                 this.store.dispatch(MetaActions.init(meta));

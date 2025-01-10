@@ -9,4 +9,5 @@ export interface ListItem extends Coin {
     name?: string;
     country?: Tags;
   };
+  wrap?: boolean;
 }

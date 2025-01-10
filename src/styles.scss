@@ -200,6 +200,11 @@ figure.clone {
 
   li {
     width: 100px;
+
+    &.sets-divider {
+      width: 100%;
+      height: 50px;
+    }
   }
 
   img {
